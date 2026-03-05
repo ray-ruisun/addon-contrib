@@ -44,7 +44,7 @@ spec:
                 - name: shared-data
                   emptyDir: {}
               containers:
-              - name: alliance-client
+              - name: flock-alliance-client
                 image: {{ .ClientJobImage }}
                 imagePullPolicy: Always
                 command:

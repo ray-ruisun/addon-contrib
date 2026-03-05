@@ -1,10 +1,10 @@
 KUBECTL ?= kubectl
 HELM ?= helm
 NAMESPACE ?= open-cluster-management
-RELEASE_NAME ?= fl-alliance-addon
-CHART_PATH ?= charts/fl-alliance-addon
+RELEASE_NAME ?= flock-addon
+CHART_PATH ?= charts/flock-addon
 
-ALLIANCE_IMAGE ?= ghcr.io/flock-io/fl-alliance-client:v0.1.0
+FLOCK_ALLIANCE_IMAGE ?= ghcr.io/flock-io/fl-alliance-client:v0.1.0
 FLOCKIT_IMAGE ?= ghcr.io/flock-io/flockit:v0.1.0
 
 .PHONY: all
@@ -13,15 +13,15 @@ all: help
 ##@ Deployment
 
 .PHONY: deploy
-deploy: ## Deploy FL Alliance addon via Helm
+deploy: ## Deploy FLock addon via Helm
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
-		--set image.repository=$$(echo $(ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set flockitImage.repository=$$(echo $(FLOCKIT_IMAGE) | cut -d: -f1) \
 		--set flockitImage.tag=$$(echo $(FLOCKIT_IMAGE) | cut -d: -f2)
 
 .PHONY: undeploy
-undeploy: ## Remove FL Alliance addon release
+undeploy: ## Remove FLock addon release
 	$(HELM) uninstall $(RELEASE_NAME) || true
 
 .PHONY: deploy-auto-gpu
@@ -44,10 +44,10 @@ endif
 	@echo "apiVersion: addon.open-cluster-management.io/v1alpha1" | \
 	{ cat; echo "kind: ManagedClusterAddOn"; } | \
 	{ cat; echo "metadata:"; } | \
-	{ cat; echo "  name: fl-alliance-addon"; } | \
+	{ cat; echo "  name: flock-addon"; } | \
 	{ cat; echo "  namespace: $(CLUSTER)"; } | \
 	{ cat; echo "spec:"; } | \
-	{ cat; echo "  installNamespace: fl-alliance-system"; } | \
+	{ cat; echo "  installNamespace: flock-system"; } | \
 	$(KUBECTL) apply -f -
 
 .PHONY: disable-addon
@@ -55,7 +55,7 @@ disable-addon: ## Disable addon on a cluster (usage: make disable-addon CLUSTER=
 ifndef CLUSTER
 	$(error CLUSTER is not set. Usage: make disable-addon CLUSTER=cluster1)
 endif
-	$(KUBECTL) delete managedclusteraddon fl-alliance-addon -n $(CLUSTER) --ignore-not-found
+	$(KUBECTL) delete managedclusteraddon flock-addon -n $(CLUSTER) --ignore-not-found
 
 .PHONY: status
 status: ## Show addon objects

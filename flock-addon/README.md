@@ -1,17 +1,17 @@
-# FL Alliance Addon
+# FLock Addon
 
-FL Alliance addon deploys **FL-Alliance-Client** and **FLocKit** together on managed clusters as one logical unit.
+FLock addon deploys **FLockAlliance** and **FLocKit** together on managed clusters as one logical unit.
 
-- `FL-Alliance-Client`: blockchain/protocol orchestration (participant loop)
+- `FLockAlliance` (`fl-alliance-client` image): blockchain/protocol orchestration (participant loop)
 - `FLocKit`: model API sidecar (`POST /call`)
 
 The addon uses OCM AddOnTemplate and supports both manual enablement and placement-based auto-install.
 
 ## Architecture
 
-- One Deployment per managed cluster (`fl-alliance-agent`)
+- One Deployment per managed cluster (`flock-agent`)
 - Two containers in the same Pod:
-  - `alliance-client` (runtime mode `redhat_ocm`)
+  - `flock-alliance-client` (runtime mode `redhat_ocm`)
   - `flockit` (serves API at `http://127.0.0.1:5000`)
 - Shared volume mounted at `/data` (`emptyDir` by default, optional PVC/hostPath)
 
@@ -23,10 +23,10 @@ The addon uses OCM AddOnTemplate and supports both manual enablement and placeme
   - local chain: point `rpc` to your local endpoint and pass local deployed addresses
   - testnet: point `rpc` + addresses to testnet contracts
 
-Create secret in each managed cluster namespace (default install namespace: `fl-alliance-system`):
+Create secret in each managed cluster namespace (default install namespace: `flock-system`):
 
 ```bash
-kubectl -n fl-alliance-system create secret generic fl-alliance-secret \
+kubectl -n flock-system create secret generic flock-alliance-secret \
   --from-literal=CLIENT_PRIVATE_KEY='0x...' \
   --from-literal=HF_TOKEN='hf_...'
 ```
@@ -34,14 +34,14 @@ kubectl -n fl-alliance-system create secret generic fl-alliance-secret \
 ## Deploy
 
 ```bash
-cd fl-alliance-addon
+cd flock-addon
 make deploy
 ```
 
 Override runtime chain/storage fields at deploy time:
 
 ```bash
-helm upgrade --install fl-alliance-addon charts/fl-alliance-addon \
+helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.blockchain.rpc='http://10.0.0.10:8545' \
   --set deploymentConfig.blockchain.tokenAddress='0x...' \
   --set deploymentConfig.blockchain.taskAddress='0x...' \
@@ -81,7 +81,7 @@ FLocKit sidecar is controlled by variables in `AddOnDeploymentConfig`:
 - `FLOCKIT_OVERRIDES`: comma/newline `key=value` overrides
 - `FLOCKIT_PORT`, `FLOCKIT_DATA_PATH`, `FLOCKIT_DATA_SOURCE`, `FLOCKIT_DATA_INDICES_PATH`
 
-This allows frequent model/template changes without modifying Alliance code.
+This allows frequent model/template changes without modifying FLockAlliance code.
 
 ## Validate Chart
 

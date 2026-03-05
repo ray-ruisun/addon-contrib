@@ -7,10 +7,10 @@ metadata:
 spec:
   agentInstallNamespace: {{ .Values.agent.namespace }}
   customizedVariables:
-    - name: ALLIANCE_IMAGE
-      value: {{ include "fl-alliance-addon.allianceImage" . | quote }}
+    - name: FLOCK_ALLIANCE_IMAGE
+      value: {{ include "flock-addon.flockAllianceImage" . | quote }}
     - name: FLOCKIT_IMAGE
-      value: {{ include "fl-alliance-addon.flockitImage" . | quote }}
+      value: {{ include "flock-addon.flockitImage" . | quote }}
     - name: MODEL_API_URL
       value: {{ .Values.agent.modelApiUrl | quote }}
     - name: DATA_PATH
@@ -63,10 +63,10 @@ metadata:
 spec:
   agentInstallNamespace: {{ .Values.agent.namespace }}
   customizedVariables:
-    - name: ALLIANCE_IMAGE
-      value: {{ include "fl-alliance-addon.allianceImage" . | quote }}
+    - name: FLOCK_ALLIANCE_IMAGE
+      value: {{ include "flock-addon.flockAllianceImage" . | quote }}
     - name: FLOCKIT_IMAGE
-      value: {{ include "fl-alliance-addon.flockitImage" . | quote }}
+      value: {{ include "flock-addon.flockitImage" . | quote }}
     - name: MODEL_API_URL
       value: {{ .Values.agent.modelApiUrl | quote }}
     - name: DATA_PATH
@@ -120,10 +120,10 @@ metadata:
 spec:
   agentInstallNamespace: {{ .Values.agent.namespace }}
   customizedVariables:
-    - name: ALLIANCE_IMAGE
-      value: {{ include "fl-alliance-addon.allianceImage" . | quote }}
+    - name: FLOCK_ALLIANCE_IMAGE
+      value: {{ include "flock-addon.flockAllianceImage" . | quote }}
     - name: FLOCKIT_IMAGE
-      value: {{ include "fl-alliance-addon.flockitImage" . | quote }}
+      value: {{ include "flock-addon.flockitImage" . | quote }}
     - name: MODEL_API_URL
       value: {{ .Values.agent.modelApiUrl | quote }}
     - name: DATA_PATH

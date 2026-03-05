@@ -4,7 +4,7 @@ As machine learning (ML) evolves, protecting data privacy becomes increasingly i
 
 Federated Learning (FL) addresses this by allowing multiple clusters or organizations to collaboratively train models without sharing sensitive data. Computation happens where the data lives, ensuring privacy, regulatory compliance, and efficiency.
 
-This Kubernetes controller automates the deployment and management of federated learning within an Open Cluster Management (OCM) environment, which provides an effective foundation for federated learning [Learn more](./docs/why-fl-in-ocm.md). The FederatedLearning CRD offers a unified, open interface for frameworks such as Flower, OpenFL, FL-Alliance, and Others, leveraging Kubernetes-native resources to coordinate servers, clients, and training across multicluster environments.
+This Kubernetes controller automates the deployment and management of federated learning within an Open Cluster Management (OCM) environment, which provides an effective foundation for federated learning [Learn more](./docs/why-fl-in-ocm.md). The FederatedLearning CRD offers a unified, open interface for frameworks such as Flower, OpenFL, FLock, and Others, leveraging Kubernetes-native resources to coordinate servers, clients, and training across multicluster environments.
 
 ![Controller Architecture](./assets/images/architecture.png)
 
@@ -171,17 +171,17 @@ spec:
                   operator: Exists
 ```
 
-### FL-Alliance framework example
+### FLock framework example
 
-`framework: alliance` deploys FL-Alliance-Client + FLocKit together on selected managed clusters via ManifestWork.
+`framework: flock` deploys FLockAlliance + FLocKit together on selected managed clusters via ManifestWork.
 
 ```yaml
 apiVersion: federation-ai.open-cluster-management.io/v1alpha1
 kind: FederatedLearning
 metadata:
-  name: fl-alliance-sample
+  name: flock-sample
 spec:
-  framework: alliance
+  framework: flock
   client:
     image: ghcr.io/flock-io/fl-alliance-client:v0.1.0
     placement:
@@ -191,9 +191,9 @@ spec:
         - requiredClusterSelector:
             claimSelector:
               matchExpressions:
-                - key: fl-alliance-sample.client-data
+                - key: flock-sample.client-data
                   operator: Exists
-  alliance:
+  flockAlliance:
     runtimeMode: redhat_ocm
     blockchainRpc: https://sepolia.base.org
     tokenAddress: 0x...
@@ -203,10 +203,10 @@ spec:
     flockitImage: ghcr.io/flock-io/flockit:v0.1.0
     flockitConfigPath: templates/llm_finetuning/configs/addon_default.yaml
     privateKeySecret:
-      name: fl-alliance-secret
+      name: flock-alliance-secret
       key: CLIENT_PRIVATE_KEY
     hfTokenSecret:
-      name: fl-alliance-secret
+      name: flock-alliance-secret
       key: HF_TOKEN
 ```
 

@@ -8,12 +8,12 @@ import (
 	"github/open-cluster-management/federated-learning/internal/controller/manifests/applier"
 )
 
-func TestAllianceClientManifestRender(t *testing.T) {
-	params := &AllianceClientParams{
-		ManifestName:           "fl-alliance",
+func TestFLockAllianceClientManifestRender(t *testing.T) {
+	params := &FLockAllianceClientParams{
+		ManifestName:           "flock-alliance",
 		ManifestNamespace:      "cluster-a",
 		ClientJobNamespace:     "fl-workload",
-		ClientJobName:          "fl-alliance-client",
+		ClientJobName:          "flock-alliance-client",
 		ClientJobImage:         "ghcr.io/flock-io/fl-alliance-client:v0.1.0",
 		FLocKitImage:           "ghcr.io/flock-io/flockit:v0.1.0",
 		DataPath:               "/data",
@@ -28,9 +28,9 @@ func TestAllianceClientManifestRender(t *testing.T) {
 		LocalSharedDir:         "/data/shared",
 		NoIncentive:            false,
 		NumParticipants:        1,
-		PrivateKeySecretName:   "fl-alliance-secret",
+		PrivateKeySecretName:   "flock-alliance-secret",
 		PrivateKeySecretKey:    "CLIENT_PRIVATE_KEY",
-		HFTokenSecretName:      "fl-alliance-secret",
+		HFTokenSecretName:      "flock-alliance-secret",
 		HFTokenSecretKey:       "HF_TOKEN",
 		HasHFTokenSecret:       true,
 		FLocKitConfigPath:      "templates/llm_finetuning/configs/addon_default.yaml",
@@ -40,7 +40,7 @@ func TestAllianceClientManifestRender(t *testing.T) {
 		FLocKitDataIndicesPath: "",
 	}
 
-	renderer := applier.NewRenderer(AllianceClientFiles)
+	renderer := applier.NewRenderer(FLockAllianceClientFiles)
 	objects, err := renderer.Render("", "", func(string) (interface{}, error) {
 		return params, nil
 	})

@@ -10,9 +10,9 @@ flockitImage:
   pullPolicy: IfNotPresent
 
 agent:
-  namespace: fl-alliance-system
+  namespace: flock-system
   replicas: 1
-  serviceAccountName: fl-alliance-agent
+  serviceAccountName: flock-agent
   modelApiUrl: http://127.0.0.1:5000
   dataPath: /data
   dataVolume:
@@ -23,7 +23,7 @@ agent:
     existingClaim: ""
     hostPath: ""
   resources:
-    alliance:
+    flockAlliance:
       requests:
         cpu: 200m
         memory: 512Mi
@@ -39,18 +39,18 @@ agent:
         memory: 8Gi
 
 addon:
-  name: fl-alliance-addon
+  name: flock-addon
   namespace: open-cluster-management
-  displayName: FL Alliance Addon
+  displayName: FLock Addon
   description: |
-    FL Alliance addon deploys FL-Alliance-Client and FLocKit as a single
-    sidecar-based workload on managed clusters. Alliance handles blockchain and
+    FLock addon deploys FLockAlliance and FLocKit as a single
+    sidecar-based workload on managed clusters. FLockAlliance handles blockchain and
     protocol orchestration, while FLocKit serves model APIs over /call.
   installStrategy: Manual
 
 deploymentConfig:
   enabled: true
-  name: fl-alliance-addon-config
+  name: flock-addon-config
 
   blockchain:
     rpc: "https://sepolia.base.org"
@@ -69,14 +69,14 @@ deploymentConfig:
     backend: "s3" # s3 | local
     localSharedDir: "/data/shared"
 
-  # Secret containing blockchain private key for FL-Alliance-Client.
+  # Secret containing blockchain private key for FLockAlliance.
   privateKeySecret:
-    name: fl-alliance-secret
+    name: flock-alliance-secret
     key: CLIENT_PRIVATE_KEY
 
-  # Optional secret used for HF model pulls in Alliance and FLocKit.
+  # Optional secret used for HF model pulls in FLockAlliance and FLocKit.
   hfTokenSecret:
-    name: fl-alliance-secret
+    name: flock-alliance-secret
     key: HF_TOKEN
 
   flockit:
@@ -90,16 +90,16 @@ deploymentConfig:
 placement:
   gpu:
     enabled: false
-    name: fl-alliance-addon-gpu-placement
+    name: flock-addon-gpu-placement
     clusterSet: default
     config:
-      name: fl-alliance-addon-gpu-config
+      name: flock-addon-gpu-config
       useGpu: "true"
 
   all:
     enabled: false
-    name: fl-alliance-addon-all-placement
+    name: flock-addon-all-placement
     clusterSet: global
     config:
-      name: fl-alliance-addon-all-config
+      name: flock-addon-all-config
       useGpu: "false"

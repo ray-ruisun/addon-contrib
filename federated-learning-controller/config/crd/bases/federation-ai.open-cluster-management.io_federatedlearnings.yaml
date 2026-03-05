@@ -532,8 +532,8 @@ spec:
                         type: array
                     type: object
                 type: object
-              alliance:
-                description: AllianceSpec defines FL-Alliance/FLocKit specific runtime
+              flockAlliance:
+                description: FLockAllianceSpec defines FLockAlliance/FLocKit specific runtime
                   settings.
                 properties:
                   blockchainRpc:
@@ -614,7 +614,7 @@ spec:
                 enum:
                 - flower
                 - openfl
-                - alliance
+                - flock
                 - other
                 type: string
               server:

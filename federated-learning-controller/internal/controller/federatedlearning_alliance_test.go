@@ -6,34 +6,34 @@ import (
 	flv1alpha1 "github/open-cluster-management/federated-learning/api/v1alpha1"
 )
 
-func validAllianceSpec() flv1alpha1.AllianceSpec {
-	return flv1alpha1.AllianceSpec{
-		RuntimeMode:     flv1alpha1.AllianceRuntimeRedHatOCM,
+func validFLockAllianceSpec() flv1alpha1.FLockAllianceSpec {
+	return flv1alpha1.FLockAllianceSpec{
+		RuntimeMode:     flv1alpha1.FLockAllianceRuntimeRedHatOCM,
 		ModelAPIURL:     "http://127.0.0.1:5000",
 		BlockchainRPC:   "http://127.0.0.1:8545",
 		TokenAddress:    "0x0000000000000000000000000000000000000001",
 		TaskAddress:     "0x0000000000000000000000000000000000000002",
-		StorageBackend:  flv1alpha1.AllianceStorageS3,
+		StorageBackend:  flv1alpha1.FLockAllianceStorageS3,
 		NumParticipants: 1,
 		FLocKitImage:    "ghcr.io/flock-io/flockit:v0.1.0",
 		PrivateKeySecret: flv1alpha1.SecretRef{
-			Name: "fl-alliance-secret",
+			Name: "flock-alliance-secret",
 			Key:  "CLIENT_PRIVATE_KEY",
 		},
 	}
 }
 
-func TestNormalizeAllianceSpec(t *testing.T) {
-	spec := normalizeAllianceSpec(flv1alpha1.AllianceSpec{})
+func TestNormalizeFLockAllianceSpec(t *testing.T) {
+	spec := normalizeFLockAllianceSpec(flv1alpha1.FLockAllianceSpec{})
 
-	if spec.RuntimeMode != flv1alpha1.AllianceRuntimeRedHatOCM {
-		t.Fatalf("expected runtime mode %q, got %q", flv1alpha1.AllianceRuntimeRedHatOCM, spec.RuntimeMode)
+	if spec.RuntimeMode != flv1alpha1.FLockAllianceRuntimeRedHatOCM {
+		t.Fatalf("expected runtime mode %q, got %q", flv1alpha1.FLockAllianceRuntimeRedHatOCM, spec.RuntimeMode)
 	}
 	if spec.ModelAPIURL != "http://127.0.0.1:5000" {
 		t.Fatalf("unexpected modelApiUrl default: %q", spec.ModelAPIURL)
 	}
-	if spec.StorageBackend != flv1alpha1.AllianceStorageS3 {
-		t.Fatalf("expected storage backend %q, got %q", flv1alpha1.AllianceStorageS3, spec.StorageBackend)
+	if spec.StorageBackend != flv1alpha1.FLockAllianceStorageS3 {
+		t.Fatalf("expected storage backend %q, got %q", flv1alpha1.FLockAllianceStorageS3, spec.StorageBackend)
 	}
 	if spec.PrivateKeySecret.Name == "" || spec.PrivateKeySecret.Key == "" {
 		t.Fatalf("expected non-empty private key secret defaults")
@@ -43,22 +43,22 @@ func TestNormalizeAllianceSpec(t *testing.T) {
 	}
 }
 
-func TestValidateAllianceSpec(t *testing.T) {
+func TestValidateFLockAllianceSpec(t *testing.T) {
 	tests := []struct {
 		name    string
-		spec    flv1alpha1.AllianceSpec
+		spec    flv1alpha1.FLockAllianceSpec
 		wantErr bool
 	}{
 		{
 			name:    "valid redhat_ocm",
-			spec:    validAllianceSpec(),
+			spec:    validFLockAllianceSpec(),
 			wantErr: false,
 		},
 		{
 			name: "valid local runtime",
-			spec: func() flv1alpha1.AllianceSpec {
-				spec := validAllianceSpec()
-				spec.RuntimeMode = flv1alpha1.AllianceRuntimeLocal
+			spec: func() flv1alpha1.FLockAllianceSpec {
+				spec := validFLockAllianceSpec()
+				spec.RuntimeMode = flv1alpha1.FLockAllianceRuntimeLocal
 				spec.ModelAPIURL = ""
 				return spec
 			}(),
@@ -66,8 +66,8 @@ func TestValidateAllianceSpec(t *testing.T) {
 		},
 		{
 			name: "invalid redhat_ocm model url",
-			spec: func() flv1alpha1.AllianceSpec {
-				spec := validAllianceSpec()
+			spec: func() flv1alpha1.FLockAllianceSpec {
+				spec := validFLockAllianceSpec()
 				spec.ModelAPIURL = "127.0.0.1:5000"
 				return spec
 			}(),
@@ -75,8 +75,8 @@ func TestValidateAllianceSpec(t *testing.T) {
 		},
 		{
 			name: "invalid storage backend",
-			spec: func() flv1alpha1.AllianceSpec {
-				spec := validAllianceSpec()
+			spec: func() flv1alpha1.FLockAllianceSpec {
+				spec := validFLockAllianceSpec()
 				spec.StorageBackend = "nfs"
 				return spec
 			}(),
@@ -84,9 +84,9 @@ func TestValidateAllianceSpec(t *testing.T) {
 		},
 		{
 			name: "partial hf token secret",
-			spec: func() flv1alpha1.AllianceSpec {
-				spec := validAllianceSpec()
-				spec.HFTokenSecret = &flv1alpha1.SecretRef{Name: "fl-alliance-secret"}
+			spec: func() flv1alpha1.FLockAllianceSpec {
+				spec := validFLockAllianceSpec()
+				spec.HFTokenSecret = &flv1alpha1.SecretRef{Name: "flock-alliance-secret"}
 				return spec
 			}(),
 			wantErr: true,
@@ -95,7 +95,7 @@ func TestValidateAllianceSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateAllianceSpec(tt.spec)
+			err := validateFLockAllianceSpec(tt.spec)
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected error, got nil")
 			}

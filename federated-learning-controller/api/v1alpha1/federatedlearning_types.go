@@ -51,21 +51,21 @@ type FederatedLearningList struct {
 type Framework string
 
 const (
-	Flower   Framework = "flower"
-	OpenFL   Framework = "openfl"
-	Alliance Framework = "alliance"
-	Other    Framework = "other"
+	Flower Framework = "flower"
+	OpenFL Framework = "openfl"
+	FLock  Framework = "flock"
+	Other  Framework = "other"
 )
 
 const (
-	AllianceRuntimeDocker    = "docker"
-	AllianceRuntimeLocal     = "local"
-	AllianceRuntimeRedHatOCM = "redhat_ocm"
+	FLockAllianceRuntimeDocker    = "docker"
+	FLockAllianceRuntimeLocal     = "local"
+	FLockAllianceRuntimeRedHatOCM = "redhat_ocm"
 )
 
 const (
-	AllianceStorageS3    = "s3"
-	AllianceStorageLocal = "local"
+	FLockAllianceStorageS3    = "s3"
+	FLockAllianceStorageLocal = "local"
 )
 
 const (
@@ -75,10 +75,10 @@ const (
 // FederatedLearningSpec defines the desired state of FederatedLearning.
 type FederatedLearningSpec struct {
 	// +kubebuilder:default=other
-	Framework Framework    `json:"framework,omitempty"`
-	Server    ServerSpec   `json:"server,omitempty"`
-	Client    ClientSpec   `json:"client,omitempty"`
-	Alliance  AllianceSpec `json:"alliance,omitempty"`
+	Framework     Framework         `json:"framework,omitempty"`
+	Server        ServerSpec        `json:"server,omitempty"`
+	Client        ClientSpec        `json:"client,omitempty"`
+	FLockAlliance FLockAllianceSpec `json:"flockAlliance,omitempty"`
 }
 
 // SecretRef defines a namespaced secret key reference.
@@ -87,8 +87,8 @@ type SecretRef struct {
 	Key  string `json:"key,omitempty"`
 }
 
-// AllianceSpec defines FL-Alliance/FLocKit specific runtime settings.
-type AllianceSpec struct {
+// FLockAllianceSpec defines FLockAlliance/FLocKit specific runtime settings.
+type FLockAllianceSpec struct {
 	// +kubebuilder:default=redhat_ocm
 	// +kubebuilder:validation:Enum=docker;local;redhat_ocm
 	RuntimeMode string `json:"runtimeMode,omitempty"`
@@ -116,7 +116,7 @@ type AllianceSpec struct {
 	NumParticipants int `json:"numParticipants,omitempty"`
 
 	PrivateKeySecret SecretRef `json:"privateKeySecret,omitempty"`
-	// Optional HF token secret for Alliance/FLocKit model pulls.
+	// Optional HF token secret for FLockAlliance/FLocKit model pulls.
 	HFTokenSecret *SecretRef `json:"hfTokenSecret,omitempty"`
 
 	// Sidecar image running FLocKit SDK server.

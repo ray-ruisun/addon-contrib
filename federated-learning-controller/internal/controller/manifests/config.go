@@ -60,8 +60,8 @@ type OpenFLClientParams struct {
 	NumberOfRounds     int
 }
 
-// AllianceClientParams defines FL-Alliance + FLocKit client workload parameters.
-type AllianceClientParams struct {
+// FLockAllianceClientParams defines FLockAlliance + FLocKit client workload parameters.
+type FLockAllianceClientParams struct {
 	ManifestName           string
 	ManifestNamespace      string
 	ClientJobNamespace     string

@@ -1,9 +1,9 @@
 apiVersion: federation-ai.open-cluster-management.io/v1alpha1
 kind: FederatedLearning
 metadata:
-  name: fl-alliance-sample
+  name: flock-sample
 spec:
-  framework: alliance
+  framework: flock
   client:
     image: ghcr.io/flock-io/fl-alliance-client:v0.1.0
     placement:
@@ -13,10 +13,10 @@ spec:
         - requiredClusterSelector:
             claimSelector:
               matchExpressions:
-                - key: fl-alliance-sample.client-data
+                - key: flock-sample.client-data
                   operator: Exists
-  # FL-Alliance/FLocKit specific settings
-  alliance:
+  # FLockAlliance/FLocKit specific settings
+  flockAlliance:
     runtimeMode: redhat_ocm
     modelApiUrl: http://127.0.0.1:5000
     useGpu: false
@@ -30,10 +30,10 @@ spec:
     numParticipants: 1
     dataPath: /data
     privateKeySecret:
-      name: fl-alliance-secret
+      name: flock-alliance-secret
       key: CLIENT_PRIVATE_KEY
     hfTokenSecret:
-      name: fl-alliance-secret
+      name: flock-alliance-secret
       key: HF_TOKEN
     flockitImage: ghcr.io/flock-io/flockit:v0.1.0
     flockitConfigPath: templates/llm_finetuning/configs/addon_default.yaml

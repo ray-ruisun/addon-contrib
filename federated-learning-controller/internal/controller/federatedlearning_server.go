@@ -45,14 +45,14 @@ func (r *FederatedLearningReconciler) federatedLearningServer(ctx context.Contex
 		return nil
 	}
 
-	// FL-Alliance does not require hub-side server job/service; only client workloads run on managed clusters.
-	if instance.Spec.Framework == flv1alpha1.Alliance {
-		alliance := normalizeAllianceSpec(instance.Spec.Alliance)
-		if err := validateAllianceSpec(alliance); err != nil {
+	// FLock framework does not require hub-side server job/service; only client workloads run on managed clusters.
+	if instance.Spec.Framework == flv1alpha1.FLock {
+		flockAlliance := normalizeFLockAllianceSpec(instance.Spec.FLockAlliance)
+		if err := validateFLockAllianceSpec(flockAlliance); err != nil {
 			return err
 		}
 		if strings.TrimSpace(instance.Spec.Client.Image) == "" {
-			return fmt.Errorf("spec.client.image is required for alliance framework")
+			return fmt.Errorf("spec.client.image is required for FLock framework")
 		}
 		return nil
 	}

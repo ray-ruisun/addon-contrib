@@ -14,5 +14,5 @@ var OpenFLServerFiles embed.FS
 //go:embed openfl/client
 var OpenFLClientFiles embed.FS
 
-//go:embed alliance/client
-var AllianceClientFiles embed.FS
+//go:embed flockalliance/client
+var FLockAllianceClientFiles embed.FS

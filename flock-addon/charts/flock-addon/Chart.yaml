@@ -1,6 +1,6 @@
 apiVersion: v2
-name: fl-alliance-addon
-description: FL Alliance + FLocKit addon for Open Cluster Management
+name: flock-addon
+description: FLock + FLocKit addon for Open Cluster Management
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

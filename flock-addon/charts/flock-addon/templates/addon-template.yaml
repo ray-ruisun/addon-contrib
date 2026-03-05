@@ -24,7 +24,7 @@ spec:
         - apiVersion: apps/v1
           kind: Deployment
           metadata:
-            name: fl-alliance-agent
+            name: flock-agent
             namespace: {{ .Values.agent.namespace }}
             labels:
               app.kubernetes.io/name: {{ .Values.addon.name }}
@@ -59,8 +59,8 @@ spec:
                     emptyDir: {}
                     {{- end }}
                 containers:
-                  - name: alliance-client
-                    image: "{{`{{ALLIANCE_IMAGE}}`}}"
+                  - name: flock-alliance-client
+                    image: "{{`{{FLOCK_ALLIANCE_IMAGE}}`}}"
                     imagePullPolicy: {{ .Values.image.pullPolicy }}
                     command:
                       - "python"
@@ -108,7 +108,7 @@ spec:
                       - name: shared-data
                         mountPath: /data
                     resources:
-                      {{- toYaml .Values.agent.resources.alliance | nindent 22 }}
+                      {{- toYaml .Values.agent.resources.flockAlliance | nindent 22 }}
 
                   - name: flockit
                     image: "{{`{{FLOCKIT_IMAGE}}`}}"

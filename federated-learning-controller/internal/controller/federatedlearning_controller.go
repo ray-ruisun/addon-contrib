@@ -130,8 +130,8 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		serverErr := r.federatedLearningServer(ctx, instance)
 		if serverErr != nil {
 			log.Errorf("failed to create/update the server: %v", serverErr)
-			// Alliance server step is pure spec validation; an error here is non-transient.
-			if instance.Spec.Framework == flv1alpha1.Alliance {
+			// FLock server step is pure spec validation; an error here is non-transient.
+			if instance.Spec.Framework == flv1alpha1.FLock {
 				err = serverErr
 				return ctrl.Result{}, err
 			}
@@ -148,7 +148,7 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Running -> Completed
 	if instance.Status.Phase == flv1alpha1.PhaseRunning ||
 		instance.Status.Phase == flv1alpha1.PhaseCompleted {
-		if instance.Spec.Framework != flv1alpha1.Alliance {
+		if instance.Spec.Framework != flv1alpha1.FLock {
 			job := &batchv1.Job{}
 			err = r.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: getSeverName(instance.Name)}, job)
 			if err != nil {
