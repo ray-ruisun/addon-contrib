@@ -1,0 +1,170 @@
+{{- if .Values.deploymentConfig.enabled }}
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnDeploymentConfig
+metadata:
+  name: {{ .Values.deploymentConfig.name }}
+  namespace: {{ .Values.addon.namespace }}
+spec:
+  agentInstallNamespace: {{ .Values.agent.namespace }}
+  customizedVariables:
+    - name: ALLIANCE_IMAGE
+      value: {{ include "fl-alliance-addon.allianceImage" . | quote }}
+    - name: FLOCKIT_IMAGE
+      value: {{ include "fl-alliance-addon.flockitImage" . | quote }}
+    - name: MODEL_API_URL
+      value: {{ .Values.agent.modelApiUrl | quote }}
+    - name: DATA_PATH
+      value: {{ .Values.agent.dataPath | quote }}
+    - name: BLOCKCHAIN_RPC
+      value: {{ .Values.deploymentConfig.blockchain.rpc | quote }}
+    - name: TOKEN_ADDRESS
+      value: {{ .Values.deploymentConfig.blockchain.tokenAddress | quote }}
+    - name: TASK_ADDRESS
+      value: {{ .Values.deploymentConfig.blockchain.taskAddress | quote }}
+    - name: STAKE
+      value: {{ .Values.deploymentConfig.blockchain.stake | quote }}
+    - name: STORAGE_BACKEND
+      value: {{ .Values.deploymentConfig.storage.backend | quote }}
+    - name: LOCAL_STORAGE_DIR
+      value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
+    - name: USE_GPU
+      value: {{ .Values.deploymentConfig.runtime.useGpu | quote }}
+    - name: NO_INCENTIVE
+      value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
+    - name: NUM_PARTICIPANTS
+      value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
+    - name: PRIVATE_KEY_SECRET_NAME
+      value: {{ .Values.deploymentConfig.privateKeySecret.name | quote }}
+    - name: PRIVATE_KEY_SECRET_KEY
+      value: {{ .Values.deploymentConfig.privateKeySecret.key | quote }}
+    - name: HF_TOKEN_SECRET_NAME
+      value: {{ .Values.deploymentConfig.hfTokenSecret.name | quote }}
+    - name: HF_TOKEN_SECRET_KEY
+      value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
+    - name: FLOCKIT_CONF
+      value: {{ .Values.deploymentConfig.flockit.confPath | quote }}
+    - name: FLOCKIT_OVERRIDES
+      value: {{ .Values.deploymentConfig.flockit.overrides | quote }}
+    - name: FLOCKIT_PORT
+      value: {{ .Values.deploymentConfig.flockit.port | quote }}
+    - name: FLOCKIT_DATA_PATH
+      value: {{ .Values.deploymentConfig.flockit.dataPath | quote }}
+    - name: FLOCKIT_DATA_SOURCE
+      value: {{ .Values.deploymentConfig.flockit.dataSource | quote }}
+    - name: FLOCKIT_DATA_INDICES_PATH
+      value: {{ .Values.deploymentConfig.flockit.dataIndicesPath | quote }}
+{{- if .Values.placement.gpu.enabled }}
+---
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnDeploymentConfig
+metadata:
+  name: {{ .Values.placement.gpu.config.name }}
+  namespace: {{ .Values.addon.namespace }}
+spec:
+  agentInstallNamespace: {{ .Values.agent.namespace }}
+  customizedVariables:
+    - name: ALLIANCE_IMAGE
+      value: {{ include "fl-alliance-addon.allianceImage" . | quote }}
+    - name: FLOCKIT_IMAGE
+      value: {{ include "fl-alliance-addon.flockitImage" . | quote }}
+    - name: MODEL_API_URL
+      value: {{ .Values.agent.modelApiUrl | quote }}
+    - name: DATA_PATH
+      value: {{ .Values.agent.dataPath | quote }}
+    - name: BLOCKCHAIN_RPC
+      value: {{ .Values.deploymentConfig.blockchain.rpc | quote }}
+    - name: TOKEN_ADDRESS
+      value: {{ .Values.deploymentConfig.blockchain.tokenAddress | quote }}
+    - name: TASK_ADDRESS
+      value: {{ .Values.deploymentConfig.blockchain.taskAddress | quote }}
+    - name: STAKE
+      value: {{ .Values.deploymentConfig.blockchain.stake | quote }}
+    - name: STORAGE_BACKEND
+      value: {{ .Values.deploymentConfig.storage.backend | quote }}
+    - name: LOCAL_STORAGE_DIR
+      value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
+    - name: USE_GPU
+      value: {{ .Values.placement.gpu.config.useGpu | quote }}
+    - name: NO_INCENTIVE
+      value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
+    - name: NUM_PARTICIPANTS
+      value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
+    - name: PRIVATE_KEY_SECRET_NAME
+      value: {{ .Values.deploymentConfig.privateKeySecret.name | quote }}
+    - name: PRIVATE_KEY_SECRET_KEY
+      value: {{ .Values.deploymentConfig.privateKeySecret.key | quote }}
+    - name: HF_TOKEN_SECRET_NAME
+      value: {{ .Values.deploymentConfig.hfTokenSecret.name | quote }}
+    - name: HF_TOKEN_SECRET_KEY
+      value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
+    - name: FLOCKIT_CONF
+      value: {{ .Values.deploymentConfig.flockit.confPath | quote }}
+    - name: FLOCKIT_OVERRIDES
+      value: {{ .Values.deploymentConfig.flockit.overrides | quote }}
+    - name: FLOCKIT_PORT
+      value: {{ .Values.deploymentConfig.flockit.port | quote }}
+    - name: FLOCKIT_DATA_PATH
+      value: {{ .Values.deploymentConfig.flockit.dataPath | quote }}
+    - name: FLOCKIT_DATA_SOURCE
+      value: {{ .Values.deploymentConfig.flockit.dataSource | quote }}
+    - name: FLOCKIT_DATA_INDICES_PATH
+      value: {{ .Values.deploymentConfig.flockit.dataIndicesPath | quote }}
+{{- end }}
+{{- if .Values.placement.all.enabled }}
+---
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnDeploymentConfig
+metadata:
+  name: {{ .Values.placement.all.config.name }}
+  namespace: {{ .Values.addon.namespace }}
+spec:
+  agentInstallNamespace: {{ .Values.agent.namespace }}
+  customizedVariables:
+    - name: ALLIANCE_IMAGE
+      value: {{ include "fl-alliance-addon.allianceImage" . | quote }}
+    - name: FLOCKIT_IMAGE
+      value: {{ include "fl-alliance-addon.flockitImage" . | quote }}
+    - name: MODEL_API_URL
+      value: {{ .Values.agent.modelApiUrl | quote }}
+    - name: DATA_PATH
+      value: {{ .Values.agent.dataPath | quote }}
+    - name: BLOCKCHAIN_RPC
+      value: {{ .Values.deploymentConfig.blockchain.rpc | quote }}
+    - name: TOKEN_ADDRESS
+      value: {{ .Values.deploymentConfig.blockchain.tokenAddress | quote }}
+    - name: TASK_ADDRESS
+      value: {{ .Values.deploymentConfig.blockchain.taskAddress | quote }}
+    - name: STAKE
+      value: {{ .Values.deploymentConfig.blockchain.stake | quote }}
+    - name: STORAGE_BACKEND
+      value: {{ .Values.deploymentConfig.storage.backend | quote }}
+    - name: LOCAL_STORAGE_DIR
+      value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
+    - name: USE_GPU
+      value: {{ .Values.placement.all.config.useGpu | quote }}
+    - name: NO_INCENTIVE
+      value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
+    - name: NUM_PARTICIPANTS
+      value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
+    - name: PRIVATE_KEY_SECRET_NAME
+      value: {{ .Values.deploymentConfig.privateKeySecret.name | quote }}
+    - name: PRIVATE_KEY_SECRET_KEY
+      value: {{ .Values.deploymentConfig.privateKeySecret.key | quote }}
+    - name: HF_TOKEN_SECRET_NAME
+      value: {{ .Values.deploymentConfig.hfTokenSecret.name | quote }}
+    - name: HF_TOKEN_SECRET_KEY
+      value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
+    - name: FLOCKIT_CONF
+      value: {{ .Values.deploymentConfig.flockit.confPath | quote }}
+    - name: FLOCKIT_OVERRIDES
+      value: {{ .Values.deploymentConfig.flockit.overrides | quote }}
+    - name: FLOCKIT_PORT
+      value: {{ .Values.deploymentConfig.flockit.port | quote }}
+    - name: FLOCKIT_DATA_PATH
+      value: {{ .Values.deploymentConfig.flockit.dataPath | quote }}
+    - name: FLOCKIT_DATA_SOURCE
+      value: {{ .Values.deploymentConfig.flockit.dataSource | quote }}
+    - name: FLOCKIT_DATA_INDICES_PATH
+      value: {{ .Values.deploymentConfig.flockit.dataIndicesPath | quote }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,42 @@
+{{- if .Values.placement.gpu.enabled }}
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: {{ .Values.placement.gpu.clusterSet }}
+  namespace: {{ .Values.addon.namespace }}
+spec:
+  clusterSet: {{ .Values.placement.gpu.clusterSet }}
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: {{ .Values.placement.gpu.name }}
+  namespace: {{ .Values.addon.namespace }}
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            gpu: "true"
+{{- end }}
+{{- if .Values.placement.all.enabled }}
+{{- if .Values.placement.gpu.enabled }}
+---
+{{- end }}
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: {{ .Values.placement.all.clusterSet }}
+  namespace: {{ .Values.addon.namespace }}
+spec:
+  clusterSet: {{ .Values.placement.all.clusterSet }}
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: {{ .Values.placement.all.name }}
+  namespace: {{ .Values.addon.namespace }}
+spec:
+  clusterSets:
+    - {{ .Values.placement.all.clusterSet }}
+{{- end }}

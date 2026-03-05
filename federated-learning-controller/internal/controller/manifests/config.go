@@ -59,3 +59,35 @@ type OpenFLClientParams struct {
 	ClientName         string
 	NumberOfRounds     int
 }
+
+// AllianceClientParams defines FL-Alliance + FLocKit client workload parameters.
+type AllianceClientParams struct {
+	ManifestName           string
+	ManifestNamespace      string
+	ClientJobNamespace     string
+	ClientJobName          string
+	ClientJobImage         string
+	FLocKitImage           string
+	DataPath               string
+	RuntimeMode            string
+	ModelAPIURL            string
+	UseGPU                 bool
+	BlockchainRPC          string
+	TokenAddress           string
+	TaskAddress            string
+	Stake                  string
+	StorageBackend         string
+	LocalSharedDir         string
+	NoIncentive            bool
+	NumParticipants        int
+	PrivateKeySecretName   string
+	PrivateKeySecretKey    string
+	HFTokenSecretName      string
+	HFTokenSecretKey       string
+	HasHFTokenSecret       bool
+	FLocKitConfigPath      string
+	FLocKitPort            int
+	FLocKitOverrides       string
+	FLocKitDataSource      string
+	FLocKitDataIndicesPath string
+}

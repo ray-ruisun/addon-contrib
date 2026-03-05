@@ -64,6 +64,14 @@ func (r *FederatedLearningReconciler) generateWorkload(ctx context.Context, inst
 	placement *clusterv1beta1.Placement,
 ) error {
 	log.Info("generate the workload for the selected clusters")
+	isAlliance := instance.Spec.Framework == flv1alpha1.Alliance
+	allianceCfg := normalizeAllianceSpec(instance.Spec.Alliance)
+	if isAlliance {
+		if err := validateAllianceSpec(allianceCfg); err != nil {
+			return err
+		}
+	}
+
 	// TODO: provide a reasonable way to determine the data configuration
 	dataKey := ""
 	for _, predicate := range placement.Spec.Predicates {
@@ -95,6 +103,9 @@ func (r *FederatedLearningReconciler) generateWorkload(ctx context.Context, inst
 					if dataKey == clusterClaim.Name {
 						dataConfig = clusterClaim.Value
 					}
+				}
+				if dataConfig == "" && isAlliance {
+					dataConfig = allianceCfg.DataPath
 				}
 				if dataConfig == "" {
 					return fmt.Errorf("failed to the dataConfig(%s) from cluster(%s)", dataKey, cluster.Name)
@@ -172,11 +183,13 @@ func (r *FederatedLearningReconciler) clusterWorkload(ctx context.Context, insta
 	clusterName, dataConfig string,
 ) error {
 	serverAddress := ""
-	for _, listener := range instance.Status.Listeners {
-		serverAddress = listener.Address
-	}
-	if serverAddress == "" {
-		return fmt.Errorf("wait the server address to be ready!")
+	if instance.Spec.Framework != flv1alpha1.Alliance {
+		for _, listener := range instance.Status.Listeners {
+			serverAddress = listener.Address
+		}
+		if serverAddress == "" {
+			return fmt.Errorf("wait the server address to be ready!")
+		}
 	}
 
 	obsSidecarImage := ""
@@ -228,6 +241,53 @@ func (r *FederatedLearningReconciler) clusterWorkload(ctx context.Context, insta
 			ClientName:         clusterName,
 			NumberOfRounds:     instance.Spec.Server.Rounds,
 		}
+	case flv1alpha1.Alliance:
+		clientFS = manifests.AllianceClientFiles
+		alliance := normalizeAllianceSpec(instance.Spec.Alliance)
+		if err := validateAllianceSpec(alliance); err != nil {
+			return err
+		}
+
+		hasHFTokenSecret := alliance.HFTokenSecret != nil &&
+			alliance.HFTokenSecret.Name != "" &&
+			alliance.HFTokenSecret.Key != ""
+		hfSecretName := ""
+		hfSecretKey := ""
+		if hasHFTokenSecret {
+			hfSecretName = alliance.HFTokenSecret.Name
+			hfSecretKey = alliance.HFTokenSecret.Key
+		}
+
+		clientParams = &manifests.AllianceClientParams{
+			ManifestName:           instance.Name,
+			ManifestNamespace:      clusterName,
+			ClientJobNamespace:     instance.Namespace,
+			ClientJobName:          fmt.Sprintf("%s-client", instance.Name),
+			ClientJobImage:         instance.Spec.Client.Image,
+			FLocKitImage:           alliance.FLocKitImage,
+			DataPath:               dataConfig,
+			RuntimeMode:            alliance.RuntimeMode,
+			ModelAPIURL:            alliance.ModelAPIURL,
+			UseGPU:                 alliance.UseGPU,
+			BlockchainRPC:          alliance.BlockchainRPC,
+			TokenAddress:           alliance.TokenAddress,
+			TaskAddress:            alliance.TaskAddress,
+			Stake:                  alliance.Stake,
+			StorageBackend:         alliance.StorageBackend,
+			LocalSharedDir:         alliance.LocalSharedDir,
+			NoIncentive:            alliance.NoIncentive,
+			NumParticipants:        alliance.NumParticipants,
+			PrivateKeySecretName:   alliance.PrivateKeySecret.Name,
+			PrivateKeySecretKey:    alliance.PrivateKeySecret.Key,
+			HFTokenSecretName:      hfSecretName,
+			HFTokenSecretKey:       hfSecretKey,
+			HasHFTokenSecret:       hasHFTokenSecret,
+			FLocKitConfigPath:      alliance.FLocKitConfigPath,
+			FLocKitPort:            alliance.FLocKitPort,
+			FLocKitOverrides:       alliance.FLocKitOverrides,
+			FLocKitDataSource:      alliance.FLocKitDataSource,
+			FLocKitDataIndicesPath: alliance.FLocKitDataIndicesPath,
+		}
 	default:
 		return fmt.Errorf("unsupported framework: %s", instance.Spec.Framework)
 	}
@@ -254,6 +314,9 @@ func (r *FederatedLearningReconciler) toRunning(ctx context.Context, instance *f
 ) error {
 	selectedClusters := placement.Status.NumberOfSelectedClusters
 	minimizeClients := instance.Spec.Server.MinAvailableClients
+	if instance.Spec.Framework == flv1alpha1.Alliance && minimizeClients < 1 {
+		minimizeClients = 1
+	}
 	if selectedClusters < int32(minimizeClients) {
 		log.Infow("waiting for the available clients", "selected", selectedClusters, "minimize", minimizeClients)
 		message := fmt.Sprintf(MessageWaitingAvailableClients, minimizeClients, selectedClusters)

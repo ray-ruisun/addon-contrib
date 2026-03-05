@@ -72,10 +72,11 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	defer func() {
-		if err != nil {
-			instance.Status.Message = err.Error()
-			instance.Status.Phase = flv1alpha1.PhaseFailed
+		if err == nil {
+			return
 		}
+		instance.Status.Message = err.Error()
+		instance.Status.Phase = flv1alpha1.PhaseFailed
 		if e := r.Status().Update(ctx, instance); e != nil {
 			log.Errorf("failed to update the instance phase into failed: %v", e)
 		}
@@ -83,10 +84,10 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// deleting the instance, clean up the resources with finalizer
 	if instance.DeletionTimestamp != nil {
-		if err := r.pruneServerResources(ctx, instance); err != nil {
+		if err = r.pruneServerResources(ctx, instance); err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.pruneClientResources(ctx, instance); err != nil {
+		if err = r.pruneClientResources(ctx, instance); err != nil {
 			return ctrl.Result{}, err
 		}
 		if controllerutil.RemoveFinalizer(instance, FederatedLearningFinalizer) {
@@ -113,8 +114,8 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if instance.Status.Phase == "" {
 		instance.Status.Phase = flv1alpha1.PhaseWaiting
 		instance.Status.Message = MessageWaitingReady
-		if e := r.Status().Update(ctx, instance); e != nil {
-			return ctrl.Result{}, e
+		if err = r.Status().Update(ctx, instance); err != nil {
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -126,13 +127,19 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 
 		// 1. server: storage, job (rounds, minAvailableClients)
-		if err := r.federatedLearningServer(ctx, instance); err != nil {
-			log.Errorf("failed to create/update the server: %v", err)
+		serverErr := r.federatedLearningServer(ctx, instance)
+		if serverErr != nil {
+			log.Errorf("failed to create/update the server: %v", serverErr)
+			// Alliance server step is pure spec validation; an error here is non-transient.
+			if instance.Spec.Framework == flv1alpha1.Alliance {
+				err = serverErr
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 
 		// 2. client: placement(based on selected cluster -> Running), Running -> generate manifestwork
-		if err := r.federatedLearningClient(ctx, instance); err != nil {
+		if err = r.federatedLearningClient(ctx, instance); err != nil {
 			log.Errorf("failed to create/update the clients: %v", err)
 			return ctrl.Result{}, err
 		}
@@ -141,18 +148,20 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Running -> Completed
 	if instance.Status.Phase == flv1alpha1.PhaseRunning ||
 		instance.Status.Phase == flv1alpha1.PhaseCompleted {
-		job := &batchv1.Job{}
-		err = r.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: getSeverName(instance.Name)}, job)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		if job.Status.Succeeded > 0 && MessageCompleted != instance.Status.Message {
-			log.Info("the job has been completed")
-			instance.Status.Phase = flv1alpha1.PhaseCompleted
-			instance.Status.Message = MessageCompleted
-			if err = r.Status().Update(ctx, instance); err != nil {
+		if instance.Spec.Framework != flv1alpha1.Alliance {
+			job := &batchv1.Job{}
+			err = r.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: getSeverName(instance.Name)}, job)
+			if err != nil {
 				return ctrl.Result{}, err
+			}
+
+			if job.Status.Succeeded > 0 && MessageCompleted != instance.Status.Message {
+				log.Info("the job has been completed")
+				instance.Status.Phase = flv1alpha1.PhaseCompleted
+				instance.Status.Message = MessageCompleted
+				if err = r.Status().Update(ctx, instance); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 		}
 	}

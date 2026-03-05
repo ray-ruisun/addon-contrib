@@ -1,0 +1,16 @@
+apiVersion: v2
+name: fl-alliance-addon
+description: FL Alliance + FLocKit addon for Open Cluster Management
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - federated-learning
+  - flock
+  - ocm
+  - open-cluster-management
+  - machine-learning
+home: https://github.com/FLock-io
+sources:
+  - https://github.com/FLock-io/FL-Alliance-Client
+  - https://github.com/FLock-io/FLocKit

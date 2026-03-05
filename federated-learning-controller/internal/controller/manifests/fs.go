@@ -13,3 +13,6 @@ var OpenFLServerFiles embed.FS
 
 //go:embed openfl/client
 var OpenFLClientFiles embed.FS
+
+//go:embed alliance/client
+var AllianceClientFiles embed.FS

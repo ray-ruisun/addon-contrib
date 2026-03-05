@@ -1,0 +1,43 @@
+apiVersion: federation-ai.open-cluster-management.io/v1alpha1
+kind: FederatedLearning
+metadata:
+  name: fl-alliance-sample
+spec:
+  framework: alliance
+  client:
+    image: ghcr.io/flock-io/fl-alliance-client:v0.1.0
+    placement:
+      clusterSets:
+        - global
+      predicates:
+        - requiredClusterSelector:
+            claimSelector:
+              matchExpressions:
+                - key: fl-alliance-sample.client-data
+                  operator: Exists
+  # FL-Alliance/FLocKit specific settings
+  alliance:
+    runtimeMode: redhat_ocm
+    modelApiUrl: http://127.0.0.1:5000
+    useGpu: false
+    blockchainRpc: https://sepolia.base.org
+    tokenAddress: 0x0000000000000000000000000000000000000000
+    taskAddress: 0x0000000000000000000000000000000000000000
+    stake: "0"
+    storageBackend: s3
+    localSharedDir: /data/shared
+    noIncentive: false
+    numParticipants: 1
+    dataPath: /data
+    privateKeySecret:
+      name: fl-alliance-secret
+      key: CLIENT_PRIVATE_KEY
+    hfTokenSecret:
+      name: fl-alliance-secret
+      key: HF_TOKEN
+    flockitImage: ghcr.io/flock-io/flockit:v0.1.0
+    flockitConfigPath: templates/llm_finetuning/configs/addon_default.yaml
+    flockitPort: 5000
+    flockitOverrides: ""
+    flockitDataSource: ""
+    flockitDataIndicesPath: ""

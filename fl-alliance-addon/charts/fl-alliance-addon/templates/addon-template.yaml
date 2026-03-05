@@ -1,0 +1,163 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnTemplate
+metadata:
+  name: {{ .Values.addon.name }}
+spec:
+  addonName: {{ .Values.addon.name }}
+  agentSpec:
+    workload:
+      manifests:
+        - apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: {{ .Values.agent.namespace }}
+            labels:
+              app.kubernetes.io/name: {{ .Values.addon.name }}
+              app.kubernetes.io/managed-by: open-cluster-management
+
+        - apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: {{ .Values.agent.serviceAccountName }}
+            namespace: {{ .Values.agent.namespace }}
+
+        - apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: fl-alliance-agent
+            namespace: {{ .Values.agent.namespace }}
+            labels:
+              app.kubernetes.io/name: {{ .Values.addon.name }}
+              app.kubernetes.io/component: agent
+            annotations:
+              cluster-name: "{{`{{CLUSTER_NAME}}`}}"
+          spec:
+            replicas: {{ .Values.agent.replicas }}
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: {{ .Values.addon.name }}
+                app.kubernetes.io/component: agent
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: {{ .Values.addon.name }}
+                  app.kubernetes.io/component: agent
+                annotations:
+                  cluster-name: "{{`{{CLUSTER_NAME}}`}}"
+              spec:
+                serviceAccountName: {{ .Values.agent.serviceAccountName }}
+                volumes:
+                  - name: shared-data
+                    {{- if .Values.agent.dataVolume.existingClaim }}
+                    persistentVolumeClaim:
+                      claimName: {{ .Values.agent.dataVolume.existingClaim }}
+                    {{- else if .Values.agent.dataVolume.hostPath }}
+                    hostPath:
+                      path: {{ .Values.agent.dataVolume.hostPath }}
+                      type: DirectoryOrCreate
+                    {{- else }}
+                    emptyDir: {}
+                    {{- end }}
+                containers:
+                  - name: alliance-client
+                    image: "{{`{{ALLIANCE_IMAGE}}`}}"
+                    imagePullPolicy: {{ .Values.image.pullPolicy }}
+                    command:
+                      - "python"
+                      - "-u"
+                      - "main.py"
+                      - "--config"
+                      - "config/conf.yaml"
+                      - "--override"
+                      - "runtime.mode=redhat_ocm"
+                      - "--override"
+                      - "runtime.model_api_url={{`{{MODEL_API_URL}}`}}"
+                      - "--override"
+                      - "runtime.gpu={{`{{USE_GPU}}`}}"
+                      - "--override"
+                      - "blockchain.rpc={{`{{BLOCKCHAIN_RPC}}`}}"
+                      - "--override"
+                      - "blockchain.token_address={{`{{TOKEN_ADDRESS}}`}}"
+                      - "--override"
+                      - "blockchain.task_address={{`{{TASK_ADDRESS}}`}}"
+                      - "--override"
+                      - "blockchain.stake={{`{{STAKE}}`}}"
+                      - "--override"
+                      - "storage.backend={{`{{STORAGE_BACKEND}}`}}"
+                      - "--override"
+                      - "storage.local.shared_dir={{`{{LOCAL_STORAGE_DIR}}`}}"
+                      - "--override"
+                      - "training.no_incentive={{`{{NO_INCENTIVE}}`}}"
+                      - "--override"
+                      - "training.num_participants={{`{{NUM_PARTICIPANTS}}`}}"
+                      - "--override"
+                      - "data.inputs={{`{{DATA_PATH}}`}}"
+                    env:
+                      - name: PRIVATE_KEY
+                        valueFrom:
+                          secretKeyRef:
+                            name: "{{`{{PRIVATE_KEY_SECRET_NAME}}`}}"
+                            key: "{{`{{PRIVATE_KEY_SECRET_KEY}}`}}"
+                      - name: HF_TOKEN
+                        valueFrom:
+                          secretKeyRef:
+                            name: "{{`{{HF_TOKEN_SECRET_NAME}}`}}"
+                            key: "{{`{{HF_TOKEN_SECRET_KEY}}`}}"
+                            optional: true
+                    volumeMounts:
+                      - name: shared-data
+                        mountPath: /data
+                    resources:
+                      {{- toYaml .Values.agent.resources.alliance | nindent 22 }}
+
+                  - name: flockit
+                    image: "{{`{{FLOCKIT_IMAGE}}`}}"
+                    imagePullPolicy: {{ .Values.flockitImage.pullPolicy }}
+                    env:
+                      - name: FLOCKIT_CONF
+                        value: "{{`{{FLOCKIT_CONF}}`}}"
+                      - name: FLOCKIT_PORT
+                        value: "{{`{{FLOCKIT_PORT}}`}}"
+                      - name: FLOCKIT_DATA_PATH
+                        value: "{{`{{FLOCKIT_DATA_PATH}}`}}"
+                      - name: FLOCKIT_DATA_SOURCE
+                        value: "{{`{{FLOCKIT_DATA_SOURCE}}`}}"
+                      - name: FLOCKIT_DATA_INDICES_PATH
+                        value: "{{`{{FLOCKIT_DATA_INDICES_PATH}}`}}"
+                      - name: FLOCKIT_OVERRIDES
+                        value: "{{`{{FLOCKIT_OVERRIDES}}`}}"
+                      - name: HF_TOKEN
+                        valueFrom:
+                          secretKeyRef:
+                            name: "{{`{{HF_TOKEN_SECRET_NAME}}`}}"
+                            key: "{{`{{HF_TOKEN_SECRET_KEY}}`}}"
+                            optional: true
+                    readinessProbe:
+                      exec:
+                        command:
+                          - /bin/bash
+                          - -c
+                          - exec 3<>/dev/tcp/127.0.0.1/${FLOCKIT_PORT:-5000}
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                    startupProbe:
+                      exec:
+                        command:
+                          - /bin/bash
+                          - -c
+                          - exec 3<>/dev/tcp/127.0.0.1/${FLOCKIT_PORT:-5000}
+                      periodSeconds: 5
+                      failureThreshold: 180
+                    livenessProbe:
+                      exec:
+                        command:
+                          - /bin/bash
+                          - -c
+                          - exec 3<>/dev/tcp/127.0.0.1/${FLOCKIT_PORT:-5000}
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                    volumeMounts:
+                      - name: shared-data
+                        mountPath: /data
+                    resources:
+                      {{- toYaml .Values.agent.resources.flockit | nindent 22 }}

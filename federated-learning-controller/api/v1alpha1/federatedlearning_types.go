@@ -51,9 +51,21 @@ type FederatedLearningList struct {
 type Framework string
 
 const (
-	Flower Framework = "flower"
-	OpenFL Framework = "openfl"
-	Other  Framework = "other"
+	Flower   Framework = "flower"
+	OpenFL   Framework = "openfl"
+	Alliance Framework = "alliance"
+	Other    Framework = "other"
+)
+
+const (
+	AllianceRuntimeDocker    = "docker"
+	AllianceRuntimeLocal     = "local"
+	AllianceRuntimeRedHatOCM = "redhat_ocm"
+)
+
+const (
+	AllianceStorageS3    = "s3"
+	AllianceStorageLocal = "local"
 )
 
 const (
@@ -63,9 +75,63 @@ const (
 // FederatedLearningSpec defines the desired state of FederatedLearning.
 type FederatedLearningSpec struct {
 	// +kubebuilder:default=other
-	Framework Framework  `json:"framework,omitempty"`
-	Server    ServerSpec `json:"server,omitempty"`
-	Client    ClientSpec `json:"client,omitempty"`
+	Framework Framework    `json:"framework,omitempty"`
+	Server    ServerSpec   `json:"server,omitempty"`
+	Client    ClientSpec   `json:"client,omitempty"`
+	Alliance  AllianceSpec `json:"alliance,omitempty"`
+}
+
+// SecretRef defines a namespaced secret key reference.
+type SecretRef struct {
+	Name string `json:"name,omitempty"`
+	Key  string `json:"key,omitempty"`
+}
+
+// AllianceSpec defines FL-Alliance/FLocKit specific runtime settings.
+type AllianceSpec struct {
+	// +kubebuilder:default=redhat_ocm
+	// +kubebuilder:validation:Enum=docker;local;redhat_ocm
+	RuntimeMode string `json:"runtimeMode,omitempty"`
+	// +kubebuilder:default=http://127.0.0.1:5000
+	ModelAPIURL string `json:"modelApiUrl,omitempty"`
+	// +kubebuilder:default=false
+	UseGPU bool `json:"useGpu,omitempty"`
+
+	BlockchainRPC string `json:"blockchainRpc,omitempty"`
+	TokenAddress  string `json:"tokenAddress,omitempty"`
+	TaskAddress   string `json:"taskAddress,omitempty"`
+	// +kubebuilder:default=0
+	Stake string `json:"stake,omitempty"`
+
+	// +kubebuilder:default=s3
+	// +kubebuilder:validation:Enum=s3;local
+	StorageBackend string `json:"storageBackend,omitempty"`
+	// +kubebuilder:default=/data/shared
+	LocalSharedDir string `json:"localSharedDir,omitempty"`
+
+	// +kubebuilder:default=false
+	NoIncentive bool `json:"noIncentive,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	NumParticipants int `json:"numParticipants,omitempty"`
+
+	PrivateKeySecret SecretRef `json:"privateKeySecret,omitempty"`
+	// Optional HF token secret for Alliance/FLocKit model pulls.
+	HFTokenSecret *SecretRef `json:"hfTokenSecret,omitempty"`
+
+	// Sidecar image running FLocKit SDK server.
+	FLocKitImage string `json:"flockitImage,omitempty"`
+	// +kubebuilder:default=templates/llm_finetuning/configs/addon_default.yaml
+	FLocKitConfigPath string `json:"flockitConfigPath,omitempty"`
+	// +kubebuilder:default=5000
+	FLocKitPort            int    `json:"flockitPort,omitempty"`
+	FLocKitOverrides       string `json:"flockitOverrides,omitempty"`
+	FLocKitDataSource      string `json:"flockitDataSource,omitempty"`
+	FLocKitDataIndicesPath string `json:"flockitDataIndicesPath,omitempty"`
+
+	// Optional fallback dataset path if no cluster claim key is selected.
+	// +kubebuilder:default=/data
+	DataPath string `json:"dataPath,omitempty"`
 }
 
 // ClientSpec defines the specification for the client in federated learning.

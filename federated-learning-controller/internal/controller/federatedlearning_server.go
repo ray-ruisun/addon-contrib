@@ -45,6 +45,18 @@ func (r *FederatedLearningReconciler) federatedLearningServer(ctx context.Contex
 		return nil
 	}
 
+	// FL-Alliance does not require hub-side server job/service; only client workloads run on managed clusters.
+	if instance.Spec.Framework == flv1alpha1.Alliance {
+		alliance := normalizeAllianceSpec(instance.Spec.Alliance)
+		if err := validateAllianceSpec(alliance); err != nil {
+			return err
+		}
+		if strings.TrimSpace(instance.Spec.Client.Image) == "" {
+			return fmt.Errorf("spec.client.image is required for alliance framework")
+		}
+		return nil
+	}
+
 	if len(instance.Spec.Server.Listeners) == 0 {
 		return fmt.Errorf("no listeners specified")
 	}

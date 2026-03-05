@@ -1,0 +1,105 @@
+# Required by addon-contrib chart CI
+image:
+  repository: ghcr.io/flock-io/fl-alliance-client
+  tag: "v0.1.0"
+  pullPolicy: IfNotPresent
+
+flockitImage:
+  repository: ghcr.io/flock-io/flockit
+  tag: "v0.1.0"
+  pullPolicy: IfNotPresent
+
+agent:
+  namespace: fl-alliance-system
+  replicas: 1
+  serviceAccountName: fl-alliance-agent
+  modelApiUrl: http://127.0.0.1:5000
+  dataPath: /data
+  dataVolume:
+    # Use one of:
+    # - emptyDir (default): ephemeral
+    # - existingClaim: bind a pre-created PVC (recommended for local storage backend)
+    # - hostPath: single-node/dev only
+    existingClaim: ""
+    hostPath: ""
+  resources:
+    alliance:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    flockit:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+
+addon:
+  name: fl-alliance-addon
+  namespace: open-cluster-management
+  displayName: FL Alliance Addon
+  description: |
+    FL Alliance addon deploys FL-Alliance-Client and FLocKit as a single
+    sidecar-based workload on managed clusters. Alliance handles blockchain and
+    protocol orchestration, while FLocKit serves model APIs over /call.
+  installStrategy: Manual
+
+deploymentConfig:
+  enabled: true
+  name: fl-alliance-addon-config
+
+  blockchain:
+    rpc: "https://sepolia.base.org"
+    tokenAddress: ""
+    taskAddress: ""
+    stake: "0"
+
+  training:
+    noIncentive: "false"
+    numParticipants: "1"
+
+  runtime:
+    useGpu: "false"
+
+  storage:
+    backend: "s3" # s3 | local
+    localSharedDir: "/data/shared"
+
+  # Secret containing blockchain private key for FL-Alliance-Client.
+  privateKeySecret:
+    name: fl-alliance-secret
+    key: CLIENT_PRIVATE_KEY
+
+  # Optional secret used for HF model pulls in Alliance and FLocKit.
+  hfTokenSecret:
+    name: fl-alliance-secret
+    key: HF_TOKEN
+
+  flockit:
+    confPath: "templates/llm_finetuning/configs/addon_default.yaml"
+    overrides: ""
+    port: "5000"
+    dataPath: "/data"
+    dataSource: ""      # Optional; maps to data_args.data_source
+    dataIndicesPath: "" # Optional; maps to data_args.data_indices_path
+
+placement:
+  gpu:
+    enabled: false
+    name: fl-alliance-addon-gpu-placement
+    clusterSet: default
+    config:
+      name: fl-alliance-addon-gpu-config
+      useGpu: "true"
+
+  all:
+    enabled: false
+    name: fl-alliance-addon-all-placement
+    clusterSet: global
+    config:
+      name: fl-alliance-addon-all-config
+      useGpu: "false"

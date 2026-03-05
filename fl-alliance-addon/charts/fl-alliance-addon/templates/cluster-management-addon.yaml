@@ -1,0 +1,48 @@
+{{- if and .Values.placement.gpu.enabled .Values.placement.all.enabled }}
+{{- fail "Only one placement mode can be enabled: placement.gpu.enabled or placement.all.enabled" }}
+{{- end }}
+{{- if and (eq .Values.addon.installStrategy "Placements") (not (or .Values.placement.gpu.enabled .Values.placement.all.enabled)) }}
+{{- fail "addon.installStrategy=Placements requires enabling one placement mode" }}
+{{- end }}
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: {{ .Values.addon.name }}
+spec:
+  addOnMeta:
+    displayName: {{ .Values.addon.displayName }}
+    description: {{ .Values.addon.description | quote }}
+  supportedConfigs:
+    - group: addon.open-cluster-management.io
+      resource: addontemplates
+      defaultConfig:
+        name: {{ .Values.addon.name }}
+    {{- if .Values.deploymentConfig.enabled }}
+    - group: addon.open-cluster-management.io
+      resource: addondeploymentconfigs
+      defaultConfig:
+        name: {{ .Values.deploymentConfig.name }}
+        namespace: {{ .Values.addon.namespace }}
+    {{- end }}
+  installStrategy:
+    type: {{ .Values.addon.installStrategy }}
+    {{- if eq .Values.addon.installStrategy "Placements" }}
+    placements:
+      {{- if .Values.placement.gpu.enabled }}
+      - name: {{ .Values.placement.gpu.name }}
+        namespace: {{ .Values.addon.namespace }}
+        configs:
+          - group: addon.open-cluster-management.io
+            resource: addondeploymentconfigs
+            name: {{ .Values.placement.gpu.config.name }}
+            namespace: {{ .Values.addon.namespace }}
+      {{- else if .Values.placement.all.enabled }}
+      - name: {{ .Values.placement.all.name }}
+        namespace: {{ .Values.addon.namespace }}
+        configs:
+          - group: addon.open-cluster-management.io
+            resource: addondeploymentconfigs
+            name: {{ .Values.placement.all.config.name }}
+            namespace: {{ .Values.addon.namespace }}
+      {{- end }}
+    {{- end }}
