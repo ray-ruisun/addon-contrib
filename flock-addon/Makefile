@@ -17,6 +17,33 @@ deploy: ## Deploy FLock addon via Helm
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2)
 
+.PHONY: deploy-testnet
+deploy-testnet: ## Deploy for shared testnet mode (usage: make deploy-testnet RPC=... TOKEN_ADDRESS=... TASK_ADDRESS=...)
+ifndef RPC
+	$(error RPC is not set. Usage: make deploy-testnet RPC=https://... TOKEN_ADDRESS=0x... TASK_ADDRESS=0x...)
+endif
+ifndef TOKEN_ADDRESS
+	$(error TOKEN_ADDRESS is not set. Usage: make deploy-testnet RPC=https://... TOKEN_ADDRESS=0x... TASK_ADDRESS=0x...)
+endif
+ifndef TASK_ADDRESS
+	$(error TASK_ADDRESS is not set. Usage: make deploy-testnet RPC=https://... TOKEN_ADDRESS=0x... TASK_ADDRESS=0x...)
+endif
+	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
+		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set deploymentConfig.blockchain.rpc='$(RPC)' \
+		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
+		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
+
+.PHONY: update-task
+update-task: ## Update shared task address only (usage: make update-task TASK_ADDRESS=0x...)
+ifndef TASK_ADDRESS
+	$(error TASK_ADDRESS is not set. Usage: make update-task TASK_ADDRESS=0x...)
+endif
+	$(HELM) upgrade $(RELEASE_NAME) $(CHART_PATH) \
+		--reuse-values \
+		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
+
 .PHONY: undeploy
 undeploy: ## Remove FLock addon release
 	$(HELM) uninstall $(RELEASE_NAME) || true

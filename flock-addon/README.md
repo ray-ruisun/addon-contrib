@@ -137,6 +137,15 @@ helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.blockchain.taskAddress='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
+Equivalent Make target:
+
+```bash
+make deploy-testnet \
+  RPC='https://sepolia.base.org' \
+  TOKEN_ADDRESS='0x...' \
+  TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+```
+
 `deploymentConfig.blockchain.taskAddress` is passed at startup as a runtime
 override (equivalent to direct client `--task-address ...`).
 
@@ -146,6 +155,12 @@ When a new task is created, update only `taskAddress`:
 helm upgrade flock-addon charts/flock-addon \
   --reuse-values \
   --set deploymentConfig.blockchain.taskAddress='0x<NEW_TASK_ADDRESS>'
+```
+
+Equivalent Make target:
+
+```bash
+make update-task TASK_ADDRESS='0x<NEW_TASK_ADDRESS>'
 ```
 
 Testnet `.env` can be minimal (for example only local secrets/files):

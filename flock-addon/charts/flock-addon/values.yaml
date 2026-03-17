@@ -40,8 +40,8 @@ deploymentConfig:
   name: flock-addon-config
 
   blockchain:
-    # RPC should come from each managed cluster's mounted .env file
-    # (for example /data/.env => BLOCKCHAIN_RPC).
+    # Shared testnet setting: set rpc/tokenAddress/taskAddress centrally via Helm.
+    # Per-cluster setting: leave empty and provide from each cluster's mounted .env.
     rpc: ""
     tokenAddress: ""
     taskAddress: ""
