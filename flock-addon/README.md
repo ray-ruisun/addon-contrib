@@ -19,9 +19,9 @@ and supports manual enablement and placement-based auto-install.
 
 - OCM hub + managed clusters
 - A blockchain private key secret on managed clusters
-- Chain runtime values can come from either:
-  - Shared hub-side deployment settings (`deploymentConfig.blockchain.*`) for one testnet task across clusters
-  - Per-cluster mounted `.env` for cluster-specific overrides
+- Default testnet behavior:
+  - `deploymentConfig.blockchain.taskAddress` is required at deploy/upgrade time
+  - Other chain values (for example `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`) are read from each cluster's mounted `.env`
 - If using `hostPath`, the same absolute path must be available on every schedulable node in each managed cluster
 
 Create secret in each managed cluster install namespace (default: `flock-system`):
@@ -49,9 +49,11 @@ helm upgrade --install flock-addon charts/flock-addon \
 
 For multi-cluster deployments:
 
-- If all clusters should run the same on-chain task, set
-  `deploymentConfig.blockchain.rpc/tokenAddress/taskAddress` centrally in Helm values.
-- If clusters need different chain settings, keep them in each cluster's mounted `.env` file.
+- Testnet default pattern:
+  - Set only `deploymentConfig.blockchain.taskAddress` from Helm values
+  - Keep `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` in each cluster's mounted `.env`
+- If you want fully centralized chain settings, you can also set
+  `deploymentConfig.blockchain.rpc/tokenAddress` in Helm values.
 
 For `deploymentConfig.storage.backend=local`, all participants must see the same
 shared filesystem path (for example via NFS-backed PVC mounted in each cluster).
@@ -110,7 +112,6 @@ HF_TOKEN=hf_...
 # Optional per-node overrides (usually keep empty for testnet shared settings):
 # BLOCKCHAIN_RPC=
 # TOKEN_ADDRESS=
-# TASK_ADDRESS=
 # STORAGE_BACKEND=s3
 # LOCAL_STORAGE_DIR=/data/shared
 ```
@@ -118,14 +119,16 @@ HF_TOKEN=hf_...
 Notes:
 
 - `PRIVATE_KEY` is injected from Kubernetes Secret (`flock-alliance-secret`), not required in `.env`.
-- `TASK_ADDRESS` can be left empty in `.env` and passed from deployment settings per run.
+- In testnet mode, `TASK_ADDRESS` should be passed from deployment settings per run.
 
 ### 2) Testnet Onchain Mode
 
 Use a public testnet RPC and testnet contract addresses.
 
-Recommended: do not keep on-chain run parameters in per-node `.env`.
-Pass them from addon deployment settings so all clusters use the same task.
+Default rule in this addon:
+
+- `taskAddress` is required from deployment settings
+- `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` are read from each cluster's mounted `.env`
 
 Testnet deploy command:
 
@@ -133,8 +136,6 @@ Testnet deploy command:
 helm upgrade --install flock-addon charts/flock-addon \
   --set agent.dataVolume.hostPath='/data/flock-client' \
   --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env' \
-  --set deploymentConfig.blockchain.rpc='https://sepolia.base.org' \
-  --set deploymentConfig.blockchain.tokenAddress='0x...' \
   --set deploymentConfig.blockchain.taskAddress='0x47B0397C6ae306002788D093b29bcD2EDAd19924' \
   --set deploymentConfig.storage.backend='s3'
 ```
@@ -143,10 +144,11 @@ Equivalent Make target:
 
 ```bash
 make deploy-testnet \
-  RPC='https://sepolia.base.org' \
-  TOKEN_ADDRESS='0x...' \
   TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
+
+Optional: if you want to override `.env` values from hub-side settings, pass
+`RPC=...` and/or `TOKEN_ADDRESS=...` to `make deploy-testnet`.
 
 `deploymentConfig.blockchain.taskAddress` is passed at startup as a runtime
 override (equivalent to direct client `--task-address ...`).
@@ -166,10 +168,13 @@ Equivalent Make target:
 make update-task TASK_ADDRESS='0x<NEW_TASK_ADDRESS>'
 ```
 
-Testnet `.env` can be minimal (for example only local secrets/files):
+Example testnet `.env`:
 
 ```dotenv
 HF_TOKEN=hf_...
+BLOCKCHAIN_RPC=https://sepolia.base.org
+TOKEN_ADDRESS=0x...
+# TASK_ADDRESS is passed by deploymentConfig.blockchain.taskAddress
 ```
 
 ### 3) Local Chain Mode
