@@ -195,9 +195,9 @@ spec:
                   operator: Exists
   flockAlliance:
     runtimeMode: local
-    # Optional: if omitted, BLOCKCHAIN_RPC can be read from <dataPath>/.env on each cluster
+    # Optional: if omitted, BLOCKCHAIN_RPC can be read from /data/.env on each cluster
     blockchainRpc: ""
-    # Optional: if omitted, TOKEN_ADDRESS/TASK_ADDRESS can be read from <dataPath>/.env
+    # Optional: if omitted, TOKEN_ADDRESS/TASK_ADDRESS can be read from /data/.env
     tokenAddress: ""
     taskAddress: ""
     stake: "0"
@@ -208,15 +208,15 @@ spec:
     hfTokenSecret:
       name: flock-alliance-secret
       key: HF_TOKEN
-    # Fixed host folder on each managed cluster node; mounted into the job at /data
-    # Place all runtime inputs there, including .env
+    # Optional fallback path field; actual mount path follows selected cluster claim value
     dataPath: /data/flock-client
 ```
 
 `framework: flock` managed-cluster Job behavior:
-- Mount host folder `flockAlliance.dataPath` to container `/data`
+- Mount host folder from selected cluster claim value to container `/data`
 - Load env file from `/data/.env` (`--env-file /data/.env`)
 - Read runtime values from that env file when CRD fields are empty
+- To use a fixed path across clusters, set the same claim value (for example `/data/flock-client`) on all selected clusters
 
 > **Note**: Only `NodePort` is supported in KinD clusters.
 

@@ -64,14 +64,6 @@ func (r *FederatedLearningReconciler) generateWorkload(ctx context.Context, inst
 	placement *clusterv1beta1.Placement,
 ) error {
 	log.Info("generate the workload for the selected clusters")
-	isFLock := instance.Spec.Framework == flv1alpha1.FLock
-	flockAllianceCfg := normalizeFLockAllianceSpec(instance.Spec.FLockAlliance)
-	if isFLock {
-		if err := validateFLockAllianceSpec(flockAllianceCfg); err != nil {
-			return err
-		}
-	}
-
 	// TODO: provide a reasonable way to determine the data configuration
 	dataKey := ""
 	for _, predicate := range placement.Spec.Predicates {
@@ -103,9 +95,6 @@ func (r *FederatedLearningReconciler) generateWorkload(ctx context.Context, inst
 					if dataKey == clusterClaim.Name {
 						dataConfig = clusterClaim.Value
 					}
-				}
-				if dataConfig == "" && isFLock {
-					dataConfig = flockAllianceCfg.DataPath
 				}
 				if dataConfig == "" {
 					return fmt.Errorf("failed to the dataConfig(%s) from cluster(%s)", dataKey, cluster.Name)

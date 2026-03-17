@@ -65,7 +65,7 @@ Example with hostPath:
 
 ```bash
 helm upgrade --install flock-addon charts/flock-addon \
-  --set agent.dataVolume.hostPath='/opt/flock-shared' \
+  --set agent.dataVolume.hostPath='/data/flock-client' \
   --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env'
 ```
 
