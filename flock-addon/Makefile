@@ -5,7 +5,6 @@ RELEASE_NAME ?= flock-addon
 CHART_PATH ?= charts/flock-addon
 
 FLOCK_ALLIANCE_IMAGE ?= ghcr.io/flock-io/fl-alliance-client:v0.1.0
-FLOCKIT_IMAGE ?= ghcr.io/flock-io/flockit:v0.1.0
 
 .PHONY: all
 all: help
@@ -16,9 +15,7 @@ all: help
 deploy: ## Deploy FLock addon via Helm
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
-		--set flockitImage.repository=$$(echo $(FLOCKIT_IMAGE) | cut -d: -f1) \
-		--set flockitImage.tag=$$(echo $(FLOCKIT_IMAGE) | cut -d: -f2)
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2)
 
 .PHONY: undeploy
 undeploy: ## Remove FLock addon release

@@ -74,8 +74,7 @@ spec:
 
                         exec python -u main.py \
                           --config config/conf.yaml \
-                          --override "runtime.mode=redhat_ocm" \
-                          --override "runtime.model_api_url=${MODEL_API_URL}" \
+                          --override "runtime.mode=local" \
                           --override "runtime.gpu=${USE_GPU}" \
                           --override "blockchain.rpc=${BLOCKCHAIN_RPC}" \
                           --override "blockchain.token_address=${TOKEN_ADDRESS}" \
@@ -87,8 +86,6 @@ spec:
                           --override "training.num_participants=${NUM_PARTICIPANTS}" \
                           --override "data.inputs=${DATA_PATH}"
                     env:
-                      - name: MODEL_API_URL
-                        value: "{{`{{MODEL_API_URL}}`}}"
                       - name: DATA_PATH
                         value: "{{`{{DATA_PATH}}`}}"
                       - name: BLOCKCHAIN_RPC
@@ -127,68 +124,3 @@ spec:
                         mountPath: /data
                     resources:
                       {{- toYaml .Values.agent.resources.flockAlliance | nindent 22 }}
-
-                  - name: flockit
-                    image: "{{`{{FLOCKIT_IMAGE}}`}}"
-                    imagePullPolicy: {{ .Values.flockitImage.pullPolicy }}
-                    command:
-                      - "/bin/sh"
-                      - "-ec"
-                      - |
-                        if [ -n "${FLOCKIT_ENV_FILE:-}" ] && [ -f "${FLOCKIT_ENV_FILE}" ]; then
-                          set -a
-                          . "${FLOCKIT_ENV_FILE}"
-                          set +a
-                        fi
-
-                        exec uv run python main.py
-                    env:
-                      - name: FLOCKIT_ENV_FILE
-                        value: "{{`{{FLOCKIT_ENV_FILE}}`}}"
-                      - name: FLOCKIT_CONF
-                        value: "{{`{{FLOCKIT_CONF}}`}}"
-                      - name: FLOCKIT_PORT
-                        value: "{{`{{FLOCKIT_PORT}}`}}"
-                      - name: FLOCKIT_DATA_PATH
-                        value: "{{`{{FLOCKIT_DATA_PATH}}`}}"
-                      - name: FLOCKIT_DATA_SOURCE
-                        value: "{{`{{FLOCKIT_DATA_SOURCE}}`}}"
-                      - name: FLOCKIT_DATA_INDICES_PATH
-                        value: "{{`{{FLOCKIT_DATA_INDICES_PATH}}`}}"
-                      - name: FLOCKIT_OVERRIDES
-                        value: "{{`{{FLOCKIT_OVERRIDES}}`}}"
-                      - name: HF_TOKEN
-                        valueFrom:
-                          secretKeyRef:
-                            name: "{{`{{HF_TOKEN_SECRET_NAME}}`}}"
-                            key: "{{`{{HF_TOKEN_SECRET_KEY}}`}}"
-                            optional: true
-                    readinessProbe:
-                      exec:
-                        command:
-                          - /bin/bash
-                          - -c
-                          - exec 3<>/dev/tcp/127.0.0.1/${FLOCKIT_PORT:-5000}
-                      initialDelaySeconds: 5
-                      periodSeconds: 5
-                    startupProbe:
-                      exec:
-                        command:
-                          - /bin/bash
-                          - -c
-                          - exec 3<>/dev/tcp/127.0.0.1/${FLOCKIT_PORT:-5000}
-                      periodSeconds: 5
-                      failureThreshold: 180
-                    livenessProbe:
-                      exec:
-                        command:
-                          - /bin/bash
-                          - -c
-                          - exec 3<>/dev/tcp/127.0.0.1/${FLOCKIT_PORT:-5000}
-                      initialDelaySeconds: 30
-                      periodSeconds: 10
-                    volumeMounts:
-                      - name: shared-data
-                        mountPath: /data
-                    resources:
-                      {{- toYaml .Values.agent.resources.flockit | nindent 22 }}

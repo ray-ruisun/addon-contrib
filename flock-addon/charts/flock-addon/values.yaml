@@ -4,16 +4,10 @@ image:
   tag: "v0.1.0"
   pullPolicy: IfNotPresent
 
-flockitImage:
-  repository: ghcr.io/flock-io/flockit
-  tag: "v0.1.0"
-  pullPolicy: IfNotPresent
-
 agent:
   namespace: flock-system
   replicas: 1
   serviceAccountName: flock-agent
-  modelApiUrl: http://127.0.0.1:5000
   dataPath: /data
   dataVolume:
     # Use one of:
@@ -30,22 +24,15 @@ agent:
       limits:
         cpu: 2000m
         memory: 2Gi
-    flockit:
-      requests:
-        cpu: 200m
-        memory: 1Gi
-      limits:
-        cpu: 4000m
-        memory: 8Gi
 
 addon:
   name: flock-addon
   namespace: open-cluster-management
   displayName: FLock Addon
   description: |
-    FLock addon deploys FLockAlliance and FLocKit as a single
-    sidecar-based workload on managed clusters. FLockAlliance handles blockchain and
-    protocol orchestration, while FLocKit serves model APIs over /call.
+    FLock addon deploys FLockAlliance as a direct client workload on managed
+    clusters. FLockAlliance handles blockchain/protocol orchestration and local
+    model execution.
   installStrategy: Manual
 
 deploymentConfig:
@@ -53,7 +40,9 @@ deploymentConfig:
   name: flock-addon-config
 
   blockchain:
-    rpc: "https://sepolia.base.org"
+    # Keep empty by default. In multi-cluster deployments, prefer reading
+    # per-cluster chain settings from mounted .env files.
+    rpc: ""
     tokenAddress: ""
     taskAddress: ""
     stake: "0"
@@ -77,21 +66,10 @@ deploymentConfig:
     name: flock-alliance-secret
     key: CLIENT_PRIVATE_KEY
 
-  # Optional secret used for HF model pulls in FLockAlliance and FLocKit.
+  # Optional secret used for HF model pulls in FLockAlliance.
   hfTokenSecret:
     name: flock-alliance-secret
     key: HF_TOKEN
-
-  flockit:
-    # Optional env file path mounted inside the Pod for FLocKit.
-    # Typical value when using the shared data volume: /data/.env
-    envFile: "/data/.env"
-    confPath: "templates/llm_finetuning/configs/addon_default.yaml"
-    overrides: ""
-    port: "5000"
-    dataPath: "/data"
-    dataSource: ""      # Optional; maps to data_args.data_source
-    dataIndicesPath: "" # Optional; maps to data_args.data_indices_path
 
 placement:
   gpu:

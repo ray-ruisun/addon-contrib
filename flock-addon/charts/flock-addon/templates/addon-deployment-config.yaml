@@ -9,10 +9,6 @@ spec:
   customizedVariables:
     - name: FLOCK_ALLIANCE_IMAGE
       value: {{ include "flock-addon.flockAllianceImage" . | quote }}
-    - name: FLOCKIT_IMAGE
-      value: {{ include "flock-addon.flockitImage" . | quote }}
-    - name: MODEL_API_URL
-      value: {{ .Values.agent.modelApiUrl | quote }}
     - name: DATA_PATH
       value: {{ .Values.agent.dataPath | quote }}
     - name: BLOCKCHAIN_RPC
@@ -43,20 +39,6 @@ spec:
       value: {{ .Values.deploymentConfig.hfTokenSecret.name | quote }}
     - name: HF_TOKEN_SECRET_KEY
       value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
-    - name: FLOCKIT_CONF
-      value: {{ .Values.deploymentConfig.flockit.confPath | quote }}
-    - name: FLOCKIT_ENV_FILE
-      value: {{ .Values.deploymentConfig.flockit.envFile | quote }}
-    - name: FLOCKIT_OVERRIDES
-      value: {{ .Values.deploymentConfig.flockit.overrides | quote }}
-    - name: FLOCKIT_PORT
-      value: {{ .Values.deploymentConfig.flockit.port | quote }}
-    - name: FLOCKIT_DATA_PATH
-      value: {{ .Values.deploymentConfig.flockit.dataPath | quote }}
-    - name: FLOCKIT_DATA_SOURCE
-      value: {{ .Values.deploymentConfig.flockit.dataSource | quote }}
-    - name: FLOCKIT_DATA_INDICES_PATH
-      value: {{ .Values.deploymentConfig.flockit.dataIndicesPath | quote }}
 {{- if .Values.placement.gpu.enabled }}
 ---
 apiVersion: addon.open-cluster-management.io/v1alpha1
@@ -69,10 +51,6 @@ spec:
   customizedVariables:
     - name: FLOCK_ALLIANCE_IMAGE
       value: {{ include "flock-addon.flockAllianceImage" . | quote }}
-    - name: FLOCKIT_IMAGE
-      value: {{ include "flock-addon.flockitImage" . | quote }}
-    - name: MODEL_API_URL
-      value: {{ .Values.agent.modelApiUrl | quote }}
     - name: DATA_PATH
       value: {{ .Values.agent.dataPath | quote }}
     - name: BLOCKCHAIN_RPC
@@ -103,20 +81,6 @@ spec:
       value: {{ .Values.deploymentConfig.hfTokenSecret.name | quote }}
     - name: HF_TOKEN_SECRET_KEY
       value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
-    - name: FLOCKIT_CONF
-      value: {{ .Values.deploymentConfig.flockit.confPath | quote }}
-    - name: FLOCKIT_ENV_FILE
-      value: {{ .Values.deploymentConfig.flockit.envFile | quote }}
-    - name: FLOCKIT_OVERRIDES
-      value: {{ .Values.deploymentConfig.flockit.overrides | quote }}
-    - name: FLOCKIT_PORT
-      value: {{ .Values.deploymentConfig.flockit.port | quote }}
-    - name: FLOCKIT_DATA_PATH
-      value: {{ .Values.deploymentConfig.flockit.dataPath | quote }}
-    - name: FLOCKIT_DATA_SOURCE
-      value: {{ .Values.deploymentConfig.flockit.dataSource | quote }}
-    - name: FLOCKIT_DATA_INDICES_PATH
-      value: {{ .Values.deploymentConfig.flockit.dataIndicesPath | quote }}
 {{- end }}
 {{- if .Values.placement.all.enabled }}
 ---
@@ -130,10 +94,6 @@ spec:
   customizedVariables:
     - name: FLOCK_ALLIANCE_IMAGE
       value: {{ include "flock-addon.flockAllianceImage" . | quote }}
-    - name: FLOCKIT_IMAGE
-      value: {{ include "flock-addon.flockitImage" . | quote }}
-    - name: MODEL_API_URL
-      value: {{ .Values.agent.modelApiUrl | quote }}
     - name: DATA_PATH
       value: {{ .Values.agent.dataPath | quote }}
     - name: BLOCKCHAIN_RPC
@@ -164,19 +124,5 @@ spec:
       value: {{ .Values.deploymentConfig.hfTokenSecret.name | quote }}
     - name: HF_TOKEN_SECRET_KEY
       value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
-    - name: FLOCKIT_CONF
-      value: {{ .Values.deploymentConfig.flockit.confPath | quote }}
-    - name: FLOCKIT_ENV_FILE
-      value: {{ .Values.deploymentConfig.flockit.envFile | quote }}
-    - name: FLOCKIT_OVERRIDES
-      value: {{ .Values.deploymentConfig.flockit.overrides | quote }}
-    - name: FLOCKIT_PORT
-      value: {{ .Values.deploymentConfig.flockit.port | quote }}
-    - name: FLOCKIT_DATA_PATH
-      value: {{ .Values.deploymentConfig.flockit.dataPath | quote }}
-    - name: FLOCKIT_DATA_SOURCE
-      value: {{ .Values.deploymentConfig.flockit.dataSource | quote }}
-    - name: FLOCKIT_DATA_INDICES_PATH
-      value: {{ .Values.deploymentConfig.flockit.dataIndicesPath | quote }}
 {{- end }}
 {{- end }}
