@@ -70,6 +70,13 @@ helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env'
 ```
 
+Path mapping rules:
+
+- Node path (host filesystem): `HOST_DATA_PATH` (default from chart `agent.dataVolume.hostPath`)
+- Container mount path: always `/data`
+- Env file path inside container: `FLOCK_ALLIANCE_ENV_FILE` (default `/data/.env`)
+- Effective `.env` on node: `${HOST_DATA_PATH}/.env`
+
 `hostPath` should be an absolute node path (for example `/data/flock-client`).
 Do not use `~` because kubelet does not expand shell home paths.
 Ensure node filesystem permissions allow kubelet and container runtime access.
