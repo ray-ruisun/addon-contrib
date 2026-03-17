@@ -55,7 +55,9 @@ For `deploymentConfig.storage.backend=local`, all participants must see the same
 shared filesystem path (for example via NFS-backed PVC mounted in each cluster).
 Set `agent.dataVolume.existingClaim=<rwx-claim>` (or `hostPath` for single-node dev).
 
-## Use Mounted `.env` (Recommended)
+## Chain Settings
+
+### 1) Common Settings (Both Modes)
 
 `flock-alliance-client` loads `/data/.env` at startup by default.
 
@@ -99,7 +101,28 @@ Place env file on each managed cluster node:
 /data/flock-client/.env
 ```
 
-Minimal `.env` for direct client:
+Common `.env` template:
+
+```dotenv
+PRIVATE_KEY=0x...
+BLOCKCHAIN_RPC=
+TOKEN_ADDRESS=
+TASK_ADDRESS=
+STAKE=0
+STORAGE_BACKEND=s3
+LOCAL_STORAGE_DIR=/data/shared
+USE_GPU=false
+NO_INCENTIVE=false
+NUM_PARTICIPANTS=1
+DATA_PATH=/data
+HF_TOKEN=hf_...
+```
+
+### 2) Testnet Onchain Mode
+
+Use a public testnet RPC and testnet contract addresses.
+
+Example `.env`:
 
 ```dotenv
 PRIVATE_KEY=0x...
@@ -114,6 +137,48 @@ NO_INCENTIVE=false
 NUM_PARTICIPANTS=1
 DATA_PATH=/data
 HF_TOKEN=hf_...
+```
+
+Deploy command:
+
+```bash
+helm upgrade --install flock-addon charts/flock-addon \
+  --set agent.dataVolume.hostPath='/data/flock-client' \
+  --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env'
+```
+
+### 3) Local Chain Mode
+
+Use a local chain RPC and contract addresses from your local deployment.
+
+Important: do not use `127.0.0.1` unless chain runs in the same Pod.
+In most cases, use a node IP or in-cluster Service DNS reachable by the addon Pod.
+
+Example `.env`:
+
+```dotenv
+PRIVATE_KEY=0x...
+BLOCKCHAIN_RPC=http://<node-ip-or-service>:8545
+TOKEN_ADDRESS=0x...
+TASK_ADDRESS=0x...
+STAKE=0
+STORAGE_BACKEND=local
+LOCAL_STORAGE_DIR=/data/shared
+USE_GPU=false
+NO_INCENTIVE=false
+NUM_PARTICIPANTS=1
+DATA_PATH=/data
+HF_TOKEN=hf_...
+```
+
+Deploy command (local storage example):
+
+```bash
+helm upgrade --install flock-addon charts/flock-addon \
+  --set agent.dataVolume.hostPath='/data/flock-client' \
+  --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env' \
+  --set deploymentConfig.storage.backend='local' \
+  --set deploymentConfig.storage.localSharedDir='/data/shared'
 ```
 
 Priority notes:
