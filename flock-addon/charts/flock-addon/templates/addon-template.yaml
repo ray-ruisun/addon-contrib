@@ -63,36 +63,54 @@ spec:
                     image: "{{`{{FLOCK_ALLIANCE_IMAGE}}`}}"
                     imagePullPolicy: {{ .Values.image.pullPolicy }}
                     command:
-                      - "python"
-                      - "-u"
-                      - "main.py"
-                      - "--config"
-                      - "config/conf.yaml"
-                      - "--override"
-                      - "runtime.mode=redhat_ocm"
-                      - "--override"
-                      - "runtime.model_api_url={{`{{MODEL_API_URL}}`}}"
-                      - "--override"
-                      - "runtime.gpu={{`{{USE_GPU}}`}}"
-                      - "--override"
-                      - "blockchain.rpc={{`{{BLOCKCHAIN_RPC}}`}}"
-                      - "--override"
-                      - "blockchain.token_address={{`{{TOKEN_ADDRESS}}`}}"
-                      - "--override"
-                      - "blockchain.task_address={{`{{TASK_ADDRESS}}`}}"
-                      - "--override"
-                      - "blockchain.stake={{`{{STAKE}}`}}"
-                      - "--override"
-                      - "storage.backend={{`{{STORAGE_BACKEND}}`}}"
-                      - "--override"
-                      - "storage.local.shared_dir={{`{{LOCAL_STORAGE_DIR}}`}}"
-                      - "--override"
-                      - "training.no_incentive={{`{{NO_INCENTIVE}}`}}"
-                      - "--override"
-                      - "training.num_participants={{`{{NUM_PARTICIPANTS}}`}}"
-                      - "--override"
-                      - "data.inputs={{`{{DATA_PATH}}`}}"
+                      - "/bin/sh"
+                      - "-ec"
+                      - |
+                        if [ -n "${FLOCK_ALLIANCE_ENV_FILE:-}" ] && [ -f "${FLOCK_ALLIANCE_ENV_FILE}" ]; then
+                          set -a
+                          . "${FLOCK_ALLIANCE_ENV_FILE}"
+                          set +a
+                        fi
+
+                        exec python -u main.py \
+                          --config config/conf.yaml \
+                          --override "runtime.mode=redhat_ocm" \
+                          --override "runtime.model_api_url=${MODEL_API_URL}" \
+                          --override "runtime.gpu=${USE_GPU}" \
+                          --override "blockchain.rpc=${BLOCKCHAIN_RPC}" \
+                          --override "blockchain.token_address=${TOKEN_ADDRESS}" \
+                          --override "blockchain.task_address=${TASK_ADDRESS}" \
+                          --override "blockchain.stake=${STAKE}" \
+                          --override "storage.backend=${STORAGE_BACKEND}" \
+                          --override "storage.local.shared_dir=${LOCAL_STORAGE_DIR}" \
+                          --override "training.no_incentive=${NO_INCENTIVE}" \
+                          --override "training.num_participants=${NUM_PARTICIPANTS}" \
+                          --override "data.inputs=${DATA_PATH}"
                     env:
+                      - name: MODEL_API_URL
+                        value: "{{`{{MODEL_API_URL}}`}}"
+                      - name: DATA_PATH
+                        value: "{{`{{DATA_PATH}}`}}"
+                      - name: BLOCKCHAIN_RPC
+                        value: "{{`{{BLOCKCHAIN_RPC}}`}}"
+                      - name: TOKEN_ADDRESS
+                        value: "{{`{{TOKEN_ADDRESS}}`}}"
+                      - name: TASK_ADDRESS
+                        value: "{{`{{TASK_ADDRESS}}`}}"
+                      - name: STAKE
+                        value: "{{`{{STAKE}}`}}"
+                      - name: STORAGE_BACKEND
+                        value: "{{`{{STORAGE_BACKEND}}`}}"
+                      - name: LOCAL_STORAGE_DIR
+                        value: "{{`{{LOCAL_STORAGE_DIR}}`}}"
+                      - name: USE_GPU
+                        value: "{{`{{USE_GPU}}`}}"
+                      - name: NO_INCENTIVE
+                        value: "{{`{{NO_INCENTIVE}}`}}"
+                      - name: NUM_PARTICIPANTS
+                        value: "{{`{{NUM_PARTICIPANTS}}`}}"
+                      - name: FLOCK_ALLIANCE_ENV_FILE
+                        value: "{{`{{FLOCK_ALLIANCE_ENV_FILE}}`}}"
                       - name: PRIVATE_KEY
                         valueFrom:
                           secretKeyRef:
@@ -113,7 +131,20 @@ spec:
                   - name: flockit
                     image: "{{`{{FLOCKIT_IMAGE}}`}}"
                     imagePullPolicy: {{ .Values.flockitImage.pullPolicy }}
+                    command:
+                      - "/bin/sh"
+                      - "-ec"
+                      - |
+                        if [ -n "${FLOCKIT_ENV_FILE:-}" ] && [ -f "${FLOCKIT_ENV_FILE}" ]; then
+                          set -a
+                          . "${FLOCKIT_ENV_FILE}"
+                          set +a
+                        fi
+
+                        exec uv run python main.py
                     env:
+                      - name: FLOCKIT_ENV_FILE
+                        value: "{{`{{FLOCKIT_ENV_FILE}}`}}"
                       - name: FLOCKIT_CONF
                         value: "{{`{{FLOCKIT_CONF}}`}}"
                       - name: FLOCKIT_PORT

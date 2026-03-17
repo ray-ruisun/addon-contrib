@@ -29,6 +29,8 @@ spec:
       value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
     - name: USE_GPU
       value: {{ .Values.deploymentConfig.runtime.useGpu | quote }}
+    - name: FLOCK_ALLIANCE_ENV_FILE
+      value: {{ .Values.deploymentConfig.runtime.flockAllianceEnvFile | quote }}
     - name: NO_INCENTIVE
       value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
     - name: NUM_PARTICIPANTS
@@ -43,6 +45,8 @@ spec:
       value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
     - name: FLOCKIT_CONF
       value: {{ .Values.deploymentConfig.flockit.confPath | quote }}
+    - name: FLOCKIT_ENV_FILE
+      value: {{ .Values.deploymentConfig.flockit.envFile | quote }}
     - name: FLOCKIT_OVERRIDES
       value: {{ .Values.deploymentConfig.flockit.overrides | quote }}
     - name: FLOCKIT_PORT
@@ -85,6 +89,8 @@ spec:
       value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
     - name: USE_GPU
       value: {{ .Values.placement.gpu.config.useGpu | quote }}
+    - name: FLOCK_ALLIANCE_ENV_FILE
+      value: {{ .Values.deploymentConfig.runtime.flockAllianceEnvFile | quote }}
     - name: NO_INCENTIVE
       value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
     - name: NUM_PARTICIPANTS
@@ -99,6 +105,8 @@ spec:
       value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
     - name: FLOCKIT_CONF
       value: {{ .Values.deploymentConfig.flockit.confPath | quote }}
+    - name: FLOCKIT_ENV_FILE
+      value: {{ .Values.deploymentConfig.flockit.envFile | quote }}
     - name: FLOCKIT_OVERRIDES
       value: {{ .Values.deploymentConfig.flockit.overrides | quote }}
     - name: FLOCKIT_PORT
@@ -142,6 +150,8 @@ spec:
       value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
     - name: USE_GPU
       value: {{ .Values.placement.all.config.useGpu | quote }}
+    - name: FLOCK_ALLIANCE_ENV_FILE
+      value: {{ .Values.deploymentConfig.runtime.flockAllianceEnvFile | quote }}
     - name: NO_INCENTIVE
       value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
     - name: NUM_PARTICIPANTS
@@ -156,6 +166,8 @@ spec:
       value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
     - name: FLOCKIT_CONF
       value: {{ .Values.deploymentConfig.flockit.confPath | quote }}
+    - name: FLOCKIT_ENV_FILE
+      value: {{ .Values.deploymentConfig.flockit.envFile | quote }}
     - name: FLOCKIT_OVERRIDES
       value: {{ .Values.deploymentConfig.flockit.overrides | quote }}
     - name: FLOCKIT_PORT

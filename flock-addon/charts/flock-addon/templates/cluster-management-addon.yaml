@@ -8,6 +8,8 @@ apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ClusterManagementAddOn
 metadata:
   name: {{ .Values.addon.name }}
+  annotations:
+    addon.open-cluster-management.io/lifecycle: addon.open-cluster-management
 spec:
   addOnMeta:
     displayName: {{ .Values.addon.displayName }}

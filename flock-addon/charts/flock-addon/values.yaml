@@ -64,6 +64,9 @@ deploymentConfig:
 
   runtime:
     useGpu: "false"
+    # Optional env file path mounted inside the Pod for FLockAlliance.
+    # Typical value when using the shared data volume: /data/.env
+    flockAllianceEnvFile: "/data/.env"
 
   storage:
     backend: "s3" # s3 | local
@@ -80,6 +83,9 @@ deploymentConfig:
     key: HF_TOKEN
 
   flockit:
+    # Optional env file path mounted inside the Pod for FLocKit.
+    # Typical value when using the shared data volume: /data/.env
+    envFile: "/data/.env"
     confPath: "templates/llm_finetuning/configs/addon_default.yaml"
     overrides: ""
     port: "5000"
