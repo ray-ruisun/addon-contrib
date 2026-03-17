@@ -173,7 +173,7 @@ spec:
 
 ### FLock framework example
 
-`framework: flock` deploys FLockAlliance + FLocKit together on selected managed clusters via ManifestWork.
+`framework: flock` deploys FLockAlliance as a direct client workload on selected managed clusters via ManifestWork.
 
 ```yaml
 apiVersion: federation-ai.open-cluster-management.io/v1alpha1
@@ -194,14 +194,12 @@ spec:
                 - key: flock-sample.client-data
                   operator: Exists
   flockAlliance:
-    runtimeMode: redhat_ocm
+    runtimeMode: local
     blockchainRpc: https://sepolia.base.org
     tokenAddress: 0x...
     taskAddress: 0x...
     stake: "0"
     storageBackend: s3
-    flockitImage: ghcr.io/flock-io/flockit:v0.1.0
-    flockitConfigPath: templates/llm_finetuning/configs/addon_default.yaml
     privateKeySecret:
       name: flock-alliance-secret
       key: CLIENT_PRIVATE_KEY
