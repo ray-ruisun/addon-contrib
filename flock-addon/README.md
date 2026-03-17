@@ -46,10 +46,11 @@ helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.storage.localSharedDir='/data/shared'
 ```
 
-For multi-cluster deployments, do **not** hardcode
-`deploymentConfig.blockchain.tokenAddress/taskAddress` in Helm values when
-you want per-cluster values. Keep per-cluster chain settings in each managed
-cluster's mounted `.env` file.
+For multi-cluster deployments:
+
+- If all clusters should run the same on-chain task, set
+  `deploymentConfig.blockchain.rpc/tokenAddress/taskAddress` centrally in Helm values.
+- If clusters need different chain settings, keep them in each cluster's mounted `.env` file.
 
 For `deploymentConfig.storage.backend=local`, all participants must see the same
 shared filesystem path (for example via NFS-backed PVC mounted in each cluster).
@@ -104,47 +105,53 @@ Place env file on each managed cluster node:
 Common `.env` template:
 
 ```dotenv
-PRIVATE_KEY=0x...
-BLOCKCHAIN_RPC=
-TOKEN_ADDRESS=
-TASK_ADDRESS=
-STAKE=0
-STORAGE_BACKEND=s3
-LOCAL_STORAGE_DIR=/data/shared
-USE_GPU=false
-NO_INCENTIVE=false
-NUM_PARTICIPANTS=1
-DATA_PATH=/data
 HF_TOKEN=hf_...
+# Optional per-node overrides (usually keep empty for testnet shared settings):
+# BLOCKCHAIN_RPC=
+# TOKEN_ADDRESS=
+# TASK_ADDRESS=
+# STORAGE_BACKEND=s3
+# LOCAL_STORAGE_DIR=/data/shared
 ```
+
+Notes:
+
+- `PRIVATE_KEY` is injected from Kubernetes Secret (`flock-alliance-secret`), not required in `.env`.
+- `TASK_ADDRESS` can be left empty in `.env` and passed from deployment settings per run.
 
 ### 2) Testnet Onchain Mode
 
 Use a public testnet RPC and testnet contract addresses.
 
-Example `.env`:
+Recommended: do not keep on-chain run parameters in per-node `.env`.
+Pass them from addon deployment settings so all clusters use the same task.
 
-```dotenv
-PRIVATE_KEY=0x...
-BLOCKCHAIN_RPC=https://sepolia.base.org
-TOKEN_ADDRESS=0x...
-TASK_ADDRESS=0x...
-STAKE=0
-STORAGE_BACKEND=s3
-LOCAL_STORAGE_DIR=/data/shared
-USE_GPU=false
-NO_INCENTIVE=false
-NUM_PARTICIPANTS=1
-DATA_PATH=/data
-HF_TOKEN=hf_...
-```
-
-Deploy command:
+Testnet deploy command:
 
 ```bash
 helm upgrade --install flock-addon charts/flock-addon \
   --set agent.dataVolume.hostPath='/data/flock-client' \
-  --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env'
+  --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env' \
+  --set deploymentConfig.blockchain.rpc='https://sepolia.base.org' \
+  --set deploymentConfig.blockchain.tokenAddress='0x...' \
+  --set deploymentConfig.blockchain.taskAddress='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+```
+
+`deploymentConfig.blockchain.taskAddress` is passed at startup as a runtime
+override (equivalent to direct client `--task-address ...`).
+
+When a new task is created, update only `taskAddress`:
+
+```bash
+helm upgrade flock-addon charts/flock-addon \
+  --reuse-values \
+  --set deploymentConfig.blockchain.taskAddress='0x<NEW_TASK_ADDRESS>'
+```
+
+Testnet `.env` can be minimal (for example only local secrets/files):
+
+```dotenv
+HF_TOKEN=hf_...
 ```
 
 ### 3) Local Chain Mode
@@ -157,17 +164,11 @@ In most cases, use a node IP or in-cluster Service DNS reachable by the addon Po
 Example `.env`:
 
 ```dotenv
-PRIVATE_KEY=0x...
 BLOCKCHAIN_RPC=http://<node-ip-or-service>:8545
 TOKEN_ADDRESS=0x...
 TASK_ADDRESS=0x...
-STAKE=0
 STORAGE_BACKEND=local
 LOCAL_STORAGE_DIR=/data/shared
-USE_GPU=false
-NO_INCENTIVE=false
-NUM_PARTICIPANTS=1
-DATA_PATH=/data
 HF_TOKEN=hf_...
 ```
 
@@ -180,6 +181,25 @@ helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.storage.backend='local' \
   --set deploymentConfig.storage.localSharedDir='/data/shared'
 ```
+
+### CLI Mapping (Old Command -> Addon)
+
+Old direct command example:
+
+```bash
+python main.py \
+  --task-address 0x47B0397C6ae306002788D093b29bcD2EDAd19924 \
+  --dataset data/asr_sarawakmalay_whisper_format_client_ids.json \
+  --hf-token $HF_TOKEN \
+  --gpu
+```
+
+Mapping in addon deployment:
+
+- `--task-address ...` -> `deploymentConfig.blockchain.taskAddress` (hub-side shared setting)
+- `--dataset ...` -> `DATA_PATH` (set `agent.dataPath`, can be file path or directory, default `/data`)
+- `--hf-token ...` -> `HF_TOKEN` secret key (`flock-alliance-secret/HF_TOKEN`) or `.env`
+- `--gpu` -> `deploymentConfig.runtime.useGpu=true`
 
 Priority notes:
 
