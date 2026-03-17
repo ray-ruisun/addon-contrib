@@ -76,7 +76,6 @@ spec:
                           --config config/conf.yaml \
                           --override "runtime.mode=local" \
                           --override "runtime.gpu=${USE_GPU}" \
-                          --override "blockchain.rpc=${BLOCKCHAIN_RPC}" \
                           --override "blockchain.token_address=${TOKEN_ADDRESS}" \
                           --override "blockchain.task_address=${TASK_ADDRESS}" \
                           --override "blockchain.stake=${STAKE}" \
@@ -88,8 +87,6 @@ spec:
                     env:
                       - name: DATA_PATH
                         value: "{{`{{DATA_PATH}}`}}"
-                      - name: BLOCKCHAIN_RPC
-                        value: "{{`{{BLOCKCHAIN_RPC}}`}}"
                       - name: TOKEN_ADDRESS
                         value: "{{`{{TOKEN_ADDRESS}}`}}"
                       - name: TASK_ADDRESS

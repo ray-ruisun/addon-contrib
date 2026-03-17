@@ -12,7 +12,7 @@ and supports manual enablement and placement-based auto-install.
 
 - One Deployment per managed cluster (`flock-agent`)
 - One container in Pod: `flock-alliance-client`
-- Shared volume mounted at `/data` (`emptyDir` by default, optional PVC/hostPath)
+- Shared volume mounted at `/data` (default hostPath: `/data/flock-client`, optional PVC/emptyDir)
 - Client loads env file from mounted volume (default: `/data/.env`)
 
 ## Prerequisites
@@ -46,8 +46,9 @@ helm upgrade --install flock-addon charts/flock-addon \
 ```
 
 For multi-cluster deployments, do **not** hardcode
-`deploymentConfig.blockchain.rpc/tokenAddress/taskAddress` in Helm values.
-Keep them in each managed cluster's mounted `.env` file.
+`deploymentConfig.blockchain.tokenAddress/taskAddress` in Helm values when
+you want per-cluster values. Keep per-cluster chain settings in each managed
+cluster's mounted `.env` file.
 
 For `deploymentConfig.storage.backend=local`, all participants must see the same
 shared filesystem path (for example via NFS-backed PVC mounted in each cluster).
@@ -71,7 +72,7 @@ helm upgrade --install flock-addon charts/flock-addon \
 Place env file on each managed cluster node:
 
 ```text
-/opt/flock-shared/.env
+/data/flock-client/.env
 ```
 
 Minimal `.env` for direct client:

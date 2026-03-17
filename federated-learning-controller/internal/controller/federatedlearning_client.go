@@ -264,10 +264,8 @@ func (r *FederatedLearningReconciler) clusterWorkload(ctx context.Context, insta
 			ClientJobNamespace:     instance.Namespace,
 			ClientJobName:          fmt.Sprintf("%s-client", instance.Name),
 			ClientJobImage:         instance.Spec.Client.Image,
-			FLocKitImage:           flockAlliance.FLocKitImage,
 			DataPath:               dataConfig,
 			RuntimeMode:            flockAlliance.RuntimeMode,
-			ModelAPIURL:            flockAlliance.ModelAPIURL,
 			UseGPU:                 flockAlliance.UseGPU,
 			BlockchainRPC:          flockAlliance.BlockchainRPC,
 			TokenAddress:           flockAlliance.TokenAddress,
@@ -282,11 +280,6 @@ func (r *FederatedLearningReconciler) clusterWorkload(ctx context.Context, insta
 			HFTokenSecretName:      hfSecretName,
 			HFTokenSecretKey:       hfSecretKey,
 			HasHFTokenSecret:       hasHFTokenSecret,
-			FLocKitConfigPath:      flockAlliance.FLocKitConfigPath,
-			FLocKitPort:            flockAlliance.FLocKitPort,
-			FLocKitOverrides:       flockAlliance.FLocKitOverrides,
-			FLocKitDataSource:      flockAlliance.FLocKitDataSource,
-			FLocKitDataIndicesPath: flockAlliance.FLocKitDataIndicesPath,
 		}
 	default:
 		return fmt.Errorf("unsupported framework: %s", instance.Spec.Framework)

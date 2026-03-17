@@ -11,11 +11,11 @@ agent:
   dataPath: /data
   dataVolume:
     # Use one of:
-    # - emptyDir (default): ephemeral
-    # - existingClaim: bind a pre-created PVC (recommended for local storage backend)
-    # - hostPath: single-node/dev only
+    # - existingClaim: bind a pre-created PVC
+    # - hostPath (default): fixed node path that includes .env + datasets
+    # - emptyDir: set both existingClaim/hostPath empty (ephemeral)
     existingClaim: ""
-    hostPath: ""
+    hostPath: "/data/flock-client"
   resources:
     flockAlliance:
       requests:
@@ -40,9 +40,8 @@ deploymentConfig:
   name: flock-addon-config
 
   blockchain:
-    # Keep empty by default. In multi-cluster deployments, prefer reading
-    # per-cluster chain settings from mounted .env files.
-    rpc: ""
+    # RPC should come from each managed cluster's mounted .env file
+    # (for example /data/.env => BLOCKCHAIN_RPC).
     tokenAddress: ""
     taskAddress: ""
     stake: "0"

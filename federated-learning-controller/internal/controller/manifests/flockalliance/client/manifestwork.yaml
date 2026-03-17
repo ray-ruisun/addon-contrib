@@ -39,10 +39,11 @@ spec:
               labels:
                 job-name: {{ .ClientJobName }}
             spec:
-              shareProcessNamespace: true
               volumes:
-                - name: shared-data
-                  emptyDir: {}
+                - name: client-data
+                  hostPath:
+                    path: {{ .DataPath }}
+                    type: DirectoryOrCreate
               containers:
               - name: flock-alliance-client
                 image: {{ .ClientJobImage }}
@@ -53,18 +54,24 @@ spec:
                   - "main.py"
                   - "--config"
                   - "config/conf.yaml"
+                  - "--env-file"
+                  - "/data/.env"
                   - "--override"
                   - "runtime.mode={{ .RuntimeMode }}"
                   - "--override"
-                  - "runtime.model_api_url={{ .ModelAPIURL }}"
-                  - "--override"
                   - "runtime.gpu={{ .UseGPU }}"
+                  {{- if .BlockchainRPC }}
                   - "--override"
                   - "blockchain.rpc={{ .BlockchainRPC }}"
+                  {{- end }}
+                  {{- if .TokenAddress }}
                   - "--override"
                   - "blockchain.token_address={{ .TokenAddress }}"
+                  {{- end }}
+                  {{- if .TaskAddress }}
                   - "--override"
                   - "blockchain.task_address={{ .TaskAddress }}"
+                  {{- end }}
                   - "--override"
                   - "blockchain.stake={{ .Stake }}"
                   - "--override"
@@ -76,7 +83,7 @@ spec:
                   - "--override"
                   - "training.num_participants={{ .NumParticipants }}"
                   - "--override"
-                  - "data.inputs={{ .DataPath }}"
+                  - "data.inputs=/data"
                 env:
                   - name: PRIVATE_KEY
                     valueFrom:
@@ -92,53 +99,6 @@ spec:
                         optional: true
                   {{- end }}
                 volumeMounts:
-                  - name: shared-data
-                    mountPath: /data
-              - name: flockit
-                image: {{ .FLocKitImage }}
-                imagePullPolicy: Always
-                ports:
-                  - name: flockit-http
-                    containerPort: {{ .FLocKitPort }}
-                env:
-                  - name: FLOCKIT_CONF
-                    value: "{{ .FLocKitConfigPath }}"
-                  - name: FLOCKIT_PORT
-                    value: "{{ .FLocKitPort }}"
-                  - name: FLOCKIT_DATA_PATH
-                    value: "{{ .DataPath }}"
-                  - name: FLOCKIT_DATA_SOURCE
-                    value: "{{ .FLocKitDataSource }}"
-                  - name: FLOCKIT_DATA_INDICES_PATH
-                    value: "{{ .FLocKitDataIndicesPath }}"
-                  - name: FLOCKIT_OVERRIDES
-                    value: |-
-                      {{ .FLocKitOverrides }}
-                  {{- if .HasHFTokenSecret }}
-                  - name: HF_TOKEN
-                    valueFrom:
-                      secretKeyRef:
-                        name: {{ .HFTokenSecretName }}
-                        key: {{ .HFTokenSecretKey }}
-                        optional: true
-                  {{- end }}
-                readinessProbe:
-                  tcpSocket:
-                    port: flockit-http
-                  initialDelaySeconds: 5
-                  periodSeconds: 5
-                startupProbe:
-                  tcpSocket:
-                    port: flockit-http
-                  # Large models may take minutes to initialize.
-                  periodSeconds: 5
-                  failureThreshold: 180
-                livenessProbe:
-                  tcpSocket:
-                    port: flockit-http
-                  initialDelaySeconds: 30
-                  periodSeconds: 10
-                volumeMounts:
-                  - name: shared-data
+                  - name: client-data
                     mountPath: /data
               restartPolicy: Never

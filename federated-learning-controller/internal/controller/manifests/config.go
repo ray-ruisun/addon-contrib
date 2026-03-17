@@ -60,17 +60,15 @@ type OpenFLClientParams struct {
 	NumberOfRounds     int
 }
 
-// FLockAllianceClientParams defines FLockAlliance + FLocKit client workload parameters.
+// FLockAllianceClientParams defines FLockAlliance client workload parameters.
 type FLockAllianceClientParams struct {
 	ManifestName           string
 	ManifestNamespace      string
 	ClientJobNamespace     string
 	ClientJobName          string
 	ClientJobImage         string
-	FLocKitImage           string
 	DataPath               string
 	RuntimeMode            string
-	ModelAPIURL            string
 	UseGPU                 bool
 	BlockchainRPC          string
 	TokenAddress           string
@@ -85,9 +83,4 @@ type FLockAllianceClientParams struct {
 	HFTokenSecretName      string
 	HFTokenSecretKey       string
 	HasHFTokenSecret       bool
-	FLocKitConfigPath      string
-	FLocKitPort            int
-	FLocKitOverrides       string
-	FLocKitDataSource      string
-	FLocKitDataIndicesPath string
 }

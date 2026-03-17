@@ -15,10 +15,8 @@ func TestFLockAllianceClientManifestRender(t *testing.T) {
 		ClientJobNamespace:     "fl-workload",
 		ClientJobName:          "flock-alliance-client",
 		ClientJobImage:         "ghcr.io/flock-io/fl-alliance-client:v0.1.0",
-		FLocKitImage:           "ghcr.io/flock-io/flockit:v0.1.0",
 		DataPath:               "/data",
-		RuntimeMode:            "redhat_ocm",
-		ModelAPIURL:            "http://127.0.0.1:5000",
+		RuntimeMode:            "local",
 		UseGPU:                 false,
 		BlockchainRPC:          "https://sepolia.base.org",
 		TokenAddress:           "0x1",
@@ -33,11 +31,6 @@ func TestFLockAllianceClientManifestRender(t *testing.T) {
 		HFTokenSecretName:      "flock-alliance-secret",
 		HFTokenSecretKey:       "HF_TOKEN",
 		HasHFTokenSecret:       true,
-		FLocKitConfigPath:      "templates/llm_finetuning/configs/addon_default.yaml",
-		FLocKitPort:            5000,
-		FLocKitOverrides:       "",
-		FLocKitDataSource:      "",
-		FLocKitDataIndicesPath: "",
 	}
 
 	renderer := applier.NewRenderer(FLockAllianceClientFiles)
@@ -59,9 +52,55 @@ func TestFLockAllianceClientManifestRender(t *testing.T) {
 		t.Fatalf("failed to marshal object: %v", err)
 	}
 	rendered := string(raw)
-	for _, token := range []string{"flockit-http", "tcpSocket", "CLIENT_PRIVATE_KEY", "HF_TOKEN"} {
+	for _, token := range []string{"--env-file", "hostPath", "CLIENT_PRIVATE_KEY", "HF_TOKEN"} {
 		if !strings.Contains(rendered, token) {
 			t.Fatalf("expected rendered manifest to contain %q", token)
 		}
+	}
+}
+
+func TestFLockAllianceClientManifestRenderWithoutTokenTaskOverrides(t *testing.T) {
+	params := &FLockAllianceClientParams{
+		ManifestName:         "flock-alliance",
+		ManifestNamespace:    "cluster-a",
+		ClientJobNamespace:   "fl-workload",
+		ClientJobName:        "flock-alliance-client",
+		ClientJobImage:       "ghcr.io/flock-io/fl-alliance-client:v0.1.0",
+		DataPath:             "/data",
+		RuntimeMode:          "local",
+		UseGPU:               false,
+		BlockchainRPC:        "",
+		TokenAddress:         "",
+		TaskAddress:          "",
+		Stake:                "0",
+		StorageBackend:       "s3",
+		LocalSharedDir:       "/data/shared",
+		NoIncentive:          false,
+		NumParticipants:      1,
+		PrivateKeySecretName: "flock-alliance-secret",
+		PrivateKeySecretKey:  "CLIENT_PRIVATE_KEY",
+		HasHFTokenSecret:     false,
+	}
+
+	renderer := applier.NewRenderer(FLockAllianceClientFiles)
+	objects, err := renderer.Render("", "", func(string) (interface{}, error) {
+		return params, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to render manifest: %v", err)
+	}
+	raw, err := json.Marshal(objects[0].Object)
+	if err != nil {
+		t.Fatalf("failed to marshal object: %v", err)
+	}
+	rendered := string(raw)
+	if strings.Contains(rendered, "blockchain.token_address=") {
+		t.Fatalf("did not expect blockchain.token_address override when token address is empty")
+	}
+	if strings.Contains(rendered, "blockchain.task_address=") {
+		t.Fatalf("did not expect blockchain.task_address override when task address is empty")
+	}
+	if strings.Contains(rendered, "blockchain.rpc=") {
+		t.Fatalf("did not expect blockchain.rpc override when rpc is empty")
 	}
 }

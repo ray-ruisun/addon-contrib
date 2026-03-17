@@ -195,9 +195,11 @@ spec:
                   operator: Exists
   flockAlliance:
     runtimeMode: local
-    blockchainRpc: https://sepolia.base.org
-    tokenAddress: 0x...
-    taskAddress: 0x...
+    # Optional: if omitted, BLOCKCHAIN_RPC can be read from <dataPath>/.env on each cluster
+    blockchainRpc: ""
+    # Optional: if omitted, TOKEN_ADDRESS/TASK_ADDRESS can be read from <dataPath>/.env
+    tokenAddress: ""
+    taskAddress: ""
     stake: "0"
     storageBackend: s3
     privateKeySecret:
@@ -206,7 +208,15 @@ spec:
     hfTokenSecret:
       name: flock-alliance-secret
       key: HF_TOKEN
+    # Fixed host folder on each managed cluster node; mounted into the job at /data
+    # Place all runtime inputs there, including .env
+    dataPath: /data/flock-client
 ```
+
+`framework: flock` managed-cluster Job behavior:
+- Mount host folder `flockAlliance.dataPath` to container `/data`
+- Load env file from `/data/.env` (`--env-file /data/.env`)
+- Read runtime values from that env file when CRD fields are empty
 
 > **Note**: Only `NodePort` is supported in KinD clusters.
 

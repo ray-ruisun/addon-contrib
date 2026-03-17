@@ -58,9 +58,8 @@ const (
 )
 
 const (
-	FLockAllianceRuntimeDocker    = "docker"
-	FLockAllianceRuntimeLocal     = "local"
-	FLockAllianceRuntimeRedHatOCM = "redhat_ocm"
+	FLockAllianceRuntimeDocker = "docker"
+	FLockAllianceRuntimeLocal  = "local"
 )
 
 const (
@@ -87,13 +86,11 @@ type SecretRef struct {
 	Key  string `json:"key,omitempty"`
 }
 
-// FLockAllianceSpec defines FLockAlliance/FLocKit specific runtime settings.
+// FLockAllianceSpec defines FLockAlliance specific runtime settings.
 type FLockAllianceSpec struct {
-	// +kubebuilder:default=redhat_ocm
-	// +kubebuilder:validation:Enum=docker;local;redhat_ocm
+	// +kubebuilder:default=local
+	// +kubebuilder:validation:Enum=docker;local
 	RuntimeMode string `json:"runtimeMode,omitempty"`
-	// +kubebuilder:default=http://127.0.0.1:5000
-	ModelAPIURL string `json:"modelApiUrl,omitempty"`
 	// +kubebuilder:default=false
 	UseGPU bool `json:"useGpu,omitempty"`
 
@@ -116,21 +113,11 @@ type FLockAllianceSpec struct {
 	NumParticipants int `json:"numParticipants,omitempty"`
 
 	PrivateKeySecret SecretRef `json:"privateKeySecret,omitempty"`
-	// Optional HF token secret for FLockAlliance/FLocKit model pulls.
+	// Optional HF token secret for model pulls.
 	HFTokenSecret *SecretRef `json:"hfTokenSecret,omitempty"`
 
-	// Sidecar image running FLocKit SDK server.
-	FLocKitImage string `json:"flockitImage,omitempty"`
-	// +kubebuilder:default=templates/llm_finetuning/configs/addon_default.yaml
-	FLocKitConfigPath string `json:"flockitConfigPath,omitempty"`
-	// +kubebuilder:default=5000
-	FLocKitPort            int    `json:"flockitPort,omitempty"`
-	FLocKitOverrides       string `json:"flockitOverrides,omitempty"`
-	FLocKitDataSource      string `json:"flockitDataSource,omitempty"`
-	FLocKitDataIndicesPath string `json:"flockitDataIndicesPath,omitempty"`
-
 	// Optional fallback dataset path if no cluster claim key is selected.
-	// +kubebuilder:default=/data
+	// +kubebuilder:default=/data/flock-client
 	DataPath string `json:"dataPath,omitempty"`
 }
 

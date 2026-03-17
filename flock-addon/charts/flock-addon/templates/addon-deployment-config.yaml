@@ -11,8 +11,6 @@ spec:
       value: {{ include "flock-addon.flockAllianceImage" . | quote }}
     - name: DATA_PATH
       value: {{ .Values.agent.dataPath | quote }}
-    - name: BLOCKCHAIN_RPC
-      value: {{ .Values.deploymentConfig.blockchain.rpc | quote }}
     - name: TOKEN_ADDRESS
       value: {{ .Values.deploymentConfig.blockchain.tokenAddress | quote }}
     - name: TASK_ADDRESS
@@ -53,8 +51,6 @@ spec:
       value: {{ include "flock-addon.flockAllianceImage" . | quote }}
     - name: DATA_PATH
       value: {{ .Values.agent.dataPath | quote }}
-    - name: BLOCKCHAIN_RPC
-      value: {{ .Values.deploymentConfig.blockchain.rpc | quote }}
     - name: TOKEN_ADDRESS
       value: {{ .Values.deploymentConfig.blockchain.tokenAddress | quote }}
     - name: TASK_ADDRESS
@@ -96,8 +92,6 @@ spec:
       value: {{ include "flock-addon.flockAllianceImage" . | quote }}
     - name: DATA_PATH
       value: {{ .Values.agent.dataPath | quote }}
-    - name: BLOCKCHAIN_RPC
-      value: {{ .Values.deploymentConfig.blockchain.rpc | quote }}
     - name: TOKEN_ADDRESS
       value: {{ .Values.deploymentConfig.blockchain.tokenAddress | quote }}
     - name: TASK_ADDRESS

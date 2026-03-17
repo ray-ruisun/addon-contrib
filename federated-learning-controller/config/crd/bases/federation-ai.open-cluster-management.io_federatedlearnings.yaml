@@ -533,28 +533,14 @@ spec:
                     type: object
                 type: object
               flockAlliance:
-                description: FLockAllianceSpec defines FLockAlliance/FLocKit specific runtime
+                description: FLockAllianceSpec defines FLockAlliance specific runtime
                   settings.
                 properties:
                   blockchainRpc:
                     type: string
                   dataPath:
-                    default: /data
+                    default: /data/flock-client
                     type: string
-                  flockitConfigPath:
-                    default: templates/llm_finetuning/configs/addon_default.yaml
-                    type: string
-                  flockitDataIndicesPath:
-                    type: string
-                  flockitDataSource:
-                    type: string
-                  flockitImage:
-                    type: string
-                  flockitOverrides:
-                    type: string
-                  flockitPort:
-                    default: 5000
-                    type: integer
                   hfTokenSecret:
                     description: SecretRef defines a namespaced secret key reference.
                     properties:
@@ -565,9 +551,6 @@ spec:
                     type: object
                   localSharedDir:
                     default: /data/shared
-                    type: string
-                  modelApiUrl:
-                    default: http://127.0.0.1:5000
                     type: string
                   noIncentive:
                     default: false
@@ -585,11 +568,10 @@ spec:
                         type: string
                     type: object
                   runtimeMode:
-                    default: redhat_ocm
+                    default: local
                     enum:
                     - docker
                     - local
-                    - redhat_ocm
                     type: string
                   stake:
                     default: "0"

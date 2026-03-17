@@ -15,29 +15,25 @@ spec:
               matchExpressions:
                 - key: flock-sample.client-data
                   operator: Exists
-  # FLockAlliance/FLocKit specific settings
+  # FLockAlliance specific settings
   flockAlliance:
-    runtimeMode: redhat_ocm
-    modelApiUrl: http://127.0.0.1:5000
+    runtimeMode: local
     useGpu: false
-    blockchainRpc: https://sepolia.base.org
-    tokenAddress: 0x0000000000000000000000000000000000000000
-    taskAddress: 0x0000000000000000000000000000000000000000
+    # Optional: if omitted, runtime can read BLOCKCHAIN_RPC from /data/.env on each cluster
+    blockchainRpc: ""
+    # Optional: if omitted, TOKEN_ADDRESS/TASK_ADDRESS can be read from /data/.env
+    tokenAddress: ""
+    taskAddress: ""
     stake: "0"
     storageBackend: s3
     localSharedDir: /data/shared
     noIncentive: false
     numParticipants: 1
-    dataPath: /data
+    # Host folder to mount into container /data. Put datasets + .env here.
+    dataPath: /data/flock-client
     privateKeySecret:
       name: flock-alliance-secret
       key: CLIENT_PRIVATE_KEY
     hfTokenSecret:
       name: flock-alliance-secret
       key: HF_TOKEN
-    flockitImage: ghcr.io/flock-io/flockit:v0.1.0
-    flockitConfigPath: templates/llm_finetuning/configs/addon_default.yaml
-    flockitPort: 5000
-    flockitOverrides: ""
-    flockitDataSource: ""
-    flockitDataIndicesPath: ""
