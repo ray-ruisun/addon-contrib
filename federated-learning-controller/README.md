@@ -164,6 +164,8 @@ spec:
       clusterSets:
         - global
       predicates:
+        # For dataVolumeType=hostPath, selected cluster claim value is used as host path.
+        # For dataVolumeType=emptyDir/pvc, this claim selector can be removed.
         - requiredClusterSelector:
             claimSelector:
               matchExpressions:
@@ -219,9 +221,12 @@ spec:
   - `hostPath`: mount selected cluster claim value
   - `emptyDir`: mount ephemeral pod-local directory
   - `pvc`: mount `flockAlliance.dataVolumeClaimName`
+- Cluster claim requirements:
+  - `hostPath`: requires claim key in placement and claim value on each selected cluster
+  - `emptyDir`/`pvc`: no cluster data claim required
 - Load env file from `/data/.env` (`--env-file /data/.env`)
 - Read runtime values from that env file when CRD fields are empty
-- For `hostPath`, use an absolute node path (for example `/data/flock-client`) and ensure kubelet can read it
+- For `hostPath`, use an absolute node path (for example `/data/flock-client`), ensure kubelet can read it, and ensure that path exists on each schedulable node of selected clusters
 
 > **Note**: Only `NodePort` is supported in KinD clusters.
 

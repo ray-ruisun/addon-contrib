@@ -21,6 +21,7 @@ and supports manual enablement and placement-based auto-install.
 - A blockchain private key secret on managed clusters
 - Per-cluster runtime values provided from mounted `.env` (recommended):
   - `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`, `TASK_ADDRESS`
+- If using `hostPath`, the same absolute path must be available on every schedulable node in each managed cluster
 
 Create secret in each managed cluster install namespace (default: `flock-system`):
 
@@ -73,6 +74,13 @@ helm upgrade --install flock-addon charts/flock-addon \
 Do not use `~` because kubelet does not expand shell home paths.
 Ensure node filesystem permissions allow kubelet and container runtime access.
 
+Prepare this directory on every node that may run the pod:
+
+```bash
+sudo mkdir -p /data/flock-client
+sudo chmod 755 /data /data/flock-client
+```
+
 Place env file on each managed cluster node:
 
 ```text
@@ -100,6 +108,7 @@ Priority notes:
 
 - AddOnDeploymentConfig provides defaults.
 - If env file exists, startup sourcing can override defaults.
+- Non-empty variables become CLI overrides; empty variables are not forced.
 - `FLockAlliance` priority remains: CLI overrides > environment > YAML config.
 
 ## Per-Cluster Config Override
@@ -107,6 +116,9 @@ Priority notes:
 If one cluster needs different defaults, create a dedicated
 `AddOnDeploymentConfig` on hub and reference it from that cluster's
 `ManagedClusterAddOn`.
+
+If one cluster uses a different node path, set `HOST_DATA_PATH` in that
+cluster's dedicated deployment config.
 
 Example dedicated config:
 
@@ -121,8 +133,16 @@ spec:
   customizedVariables:
     - name: FLOCK_ALLIANCE_ENV_FILE
       value: /data/.env
+    - name: BLOCKCHAIN_RPC
+      value: ""
+    - name: TOKEN_ADDRESS
+      value: ""
+    - name: TASK_ADDRESS
+      value: ""
     - name: DATA_PATH
       value: /data
+    - name: HOST_DATA_PATH
+      value: /data/flock-client
 ```
 
 Reference from `ManagedClusterAddOn`:

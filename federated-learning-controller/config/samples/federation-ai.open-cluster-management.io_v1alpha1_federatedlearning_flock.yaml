@@ -10,6 +10,8 @@ spec:
       clusterSets:
         - global
       predicates:
+        # For dataVolumeType=hostPath, selected cluster claim value is used as host path.
+        # For dataVolumeType=emptyDir/pvc, this claim selector can be removed.
         - requiredClusterSelector:
             claimSelector:
               matchExpressions:

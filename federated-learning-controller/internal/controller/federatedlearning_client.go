@@ -65,15 +65,28 @@ func (r *FederatedLearningReconciler) generateWorkload(ctx context.Context, inst
 ) error {
 	log.Info("generate the workload for the selected clusters")
 	// TODO: provide a reasonable way to determine the data configuration
-	dataKey := ""
-	for _, predicate := range placement.Spec.Predicates {
-		for _, matchExpression := range predicate.RequiredClusterSelector.ClaimSelector.MatchExpressions {
-			if matchExpression.Operator == metav1.LabelSelectorOpExists {
-				dataKey = matchExpression.Key
-			}
+	requireClusterDataConfig := true
+	if instance.Spec.Framework == flv1alpha1.FLock {
+		flockAlliance := normalizeFLockAllianceSpec(instance.Spec.FLockAlliance)
+		if flockAlliance.DataVolumeType == flv1alpha1.FLockAllianceDataVolumeEmptyDir ||
+			flockAlliance.DataVolumeType == flv1alpha1.FLockAllianceDataVolumePVC {
+			requireClusterDataConfig = false
 		}
 	}
-	log.Infow("determine the dataKey", "dataKey", dataKey)
+	dataKey := ""
+	if requireClusterDataConfig {
+		for _, predicate := range placement.Spec.Predicates {
+			for _, matchExpression := range predicate.RequiredClusterSelector.ClaimSelector.MatchExpressions {
+				if matchExpression.Operator == metav1.LabelSelectorOpExists {
+					dataKey = matchExpression.Key
+				}
+			}
+		}
+		log.Infow("determine the dataKey", "dataKey", dataKey)
+		if dataKey == "" {
+			return fmt.Errorf("failed to determine cluster data claim key from placement predicates")
+		}
+	}
 	count := 0
 	for _, decisionGroup := range placement.Status.DecisionGroups {
 		for _, decisionName := range decisionGroup.Decisions {
@@ -91,13 +104,15 @@ func (r *FederatedLearningReconciler) generateWorkload(ctx context.Context, inst
 					return err
 				}
 				dataConfig := ""
-				for _, clusterClaim := range cluster.Status.ClusterClaims {
-					if dataKey == clusterClaim.Name {
-						dataConfig = clusterClaim.Value
+				if requireClusterDataConfig {
+					for _, clusterClaim := range cluster.Status.ClusterClaims {
+						if dataKey == clusterClaim.Name {
+							dataConfig = clusterClaim.Value
+						}
 					}
-				}
-				if dataConfig == "" {
-					return fmt.Errorf("failed to the dataConfig(%s) from cluster(%s)", dataKey, cluster.Name)
+					if dataConfig == "" {
+						return fmt.Errorf("failed to the dataConfig(%s) from cluster(%s)", dataKey, cluster.Name)
+					}
 				}
 				if err := r.clusterWorkload(ctx, instance, cluster.Name, dataConfig); err != nil {
 					log.Errorw("failed to generate the workload for the cluster", "cluster", cluster.Name, "error", err)

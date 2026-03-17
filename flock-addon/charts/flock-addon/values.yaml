@@ -42,6 +42,7 @@ deploymentConfig:
   blockchain:
     # RPC should come from each managed cluster's mounted .env file
     # (for example /data/.env => BLOCKCHAIN_RPC).
+    rpc: ""
     tokenAddress: ""
     taskAddress: ""
     stake: "0"

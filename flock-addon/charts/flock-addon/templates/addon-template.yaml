@@ -53,7 +53,7 @@ spec:
                       claimName: {{ .Values.agent.dataVolume.existingClaim }}
                     {{- else if .Values.agent.dataVolume.hostPath }}
                     hostPath:
-                      path: {{ .Values.agent.dataVolume.hostPath }}
+                      path: "{{`{{HOST_DATA_PATH}}`}}"
                       type: DirectoryOrCreate
                     {{- else }}
                     emptyDir: {}
@@ -72,21 +72,32 @@ spec:
                           set +a
                         fi
 
-                        exec python -u main.py \
+                        set -- python -u main.py \
                           --config config/conf.yaml \
                           --override "runtime.mode=local" \
                           --override "runtime.gpu=${USE_GPU}" \
-                          --override "blockchain.token_address=${TOKEN_ADDRESS}" \
-                          --override "blockchain.task_address=${TASK_ADDRESS}" \
                           --override "blockchain.stake=${STAKE}" \
                           --override "storage.backend=${STORAGE_BACKEND}" \
                           --override "storage.local.shared_dir=${LOCAL_STORAGE_DIR}" \
                           --override "training.no_incentive=${NO_INCENTIVE}" \
                           --override "training.num_participants=${NUM_PARTICIPANTS}" \
                           --override "data.inputs=${DATA_PATH}"
+                        if [ -n "${BLOCKCHAIN_RPC:-}" ]; then
+                          set -- "$@" --override "blockchain.rpc=${BLOCKCHAIN_RPC}"
+                        fi
+                        if [ -n "${TOKEN_ADDRESS:-}" ]; then
+                          set -- "$@" --override "blockchain.token_address=${TOKEN_ADDRESS}"
+                        fi
+                        if [ -n "${TASK_ADDRESS:-}" ]; then
+                          set -- "$@" --override "blockchain.task_address=${TASK_ADDRESS}"
+                        fi
+
+                        exec "$@"
                     env:
                       - name: DATA_PATH
                         value: "{{`{{DATA_PATH}}`}}"
+                      - name: BLOCKCHAIN_RPC
+                        value: "{{`{{BLOCKCHAIN_RPC}}`}}"
                       - name: TOKEN_ADDRESS
                         value: "{{`{{TOKEN_ADDRESS}}`}}"
                       - name: TASK_ADDRESS
