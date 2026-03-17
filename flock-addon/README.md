@@ -19,8 +19,9 @@ and supports manual enablement and placement-based auto-install.
 
 - OCM hub + managed clusters
 - A blockchain private key secret on managed clusters
-- Per-cluster runtime values provided from mounted `.env` (recommended):
-  - `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`, `TASK_ADDRESS`
+- Chain runtime values can come from either:
+  - Shared hub-side deployment settings (`deploymentConfig.blockchain.*`) for one testnet task across clusters
+  - Per-cluster mounted `.env` for cluster-specific overrides
 - If using `hostPath`, the same absolute path must be available on every schedulable node in each managed cluster
 
 Create secret in each managed cluster install namespace (default: `flock-system`):
@@ -134,7 +135,8 @@ helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env' \
   --set deploymentConfig.blockchain.rpc='https://sepolia.base.org' \
   --set deploymentConfig.blockchain.tokenAddress='0x...' \
-  --set deploymentConfig.blockchain.taskAddress='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+  --set deploymentConfig.blockchain.taskAddress='0x47B0397C6ae306002788D093b29bcD2EDAd19924' \
+  --set deploymentConfig.storage.backend='s3'
 ```
 
 Equivalent Make target:
@@ -148,6 +150,7 @@ make deploy-testnet \
 
 `deploymentConfig.blockchain.taskAddress` is passed at startup as a runtime
 override (equivalent to direct client `--task-address ...`).
+When `storage.backend=s3`, client uses S3 signer mode by default.
 
 When a new task is created, update only `taskAddress`:
 

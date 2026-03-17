@@ -33,7 +33,8 @@ endif
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set deploymentConfig.blockchain.rpc='$(RPC)' \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
-		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
+		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
+		--set deploymentConfig.storage.backend='s3'
 
 .PHONY: update-task
 update-task: ## Update shared task address only (usage: make update-task TASK_ADDRESS=0x...)
@@ -42,7 +43,8 @@ ifndef TASK_ADDRESS
 endif
 	$(HELM) upgrade $(RELEASE_NAME) $(CHART_PATH) \
 		--reuse-values \
-		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
+		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
+		--set deploymentConfig.storage.backend='s3'
 
 .PHONY: undeploy
 undeploy: ## Remove FLock addon release
