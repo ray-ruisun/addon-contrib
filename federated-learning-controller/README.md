@@ -208,15 +208,20 @@ spec:
     hfTokenSecret:
       name: flock-alliance-secret
       key: HF_TOKEN
-    # Optional fallback path field; actual mount path follows selected cluster claim value
-    dataPath: /data/flock-client
+    # Mount strategy for /data in managed-cluster job: hostPath | emptyDir | pvc
+    dataVolumeType: hostPath
+    # Required only when dataVolumeType=pvc
+    # dataVolumeClaimName: flock-client-data
 ```
 
 `framework: flock` managed-cluster Job behavior:
-- Mount host folder from selected cluster claim value to container `/data`
+- Mount data volume to container `/data`:
+  - `hostPath`: mount selected cluster claim value
+  - `emptyDir`: mount ephemeral pod-local directory
+  - `pvc`: mount `flockAlliance.dataVolumeClaimName`
 - Load env file from `/data/.env` (`--env-file /data/.env`)
 - Read runtime values from that env file when CRD fields are empty
-- To use a fixed path across clusters, set the same claim value (for example `/data/flock-client`) on all selected clusters
+- For `hostPath`, use an absolute node path (for example `/data/flock-client`) and ensure kubelet can read it
 
 > **Note**: Only `NodePort` is supported in KinD clusters.
 

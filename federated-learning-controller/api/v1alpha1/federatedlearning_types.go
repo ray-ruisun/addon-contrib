@@ -68,6 +68,12 @@ const (
 )
 
 const (
+	FLockAllianceDataVolumeHostPath = "hostPath"
+	FLockAllianceDataVolumeEmptyDir = "emptyDir"
+	FLockAllianceDataVolumePVC      = "pvc"
+)
+
+const (
 	AnnotationSidecarImage = "federated-learning.io/sidecar-image"
 )
 
@@ -112,13 +118,15 @@ type FLockAllianceSpec struct {
 	// +kubebuilder:default=1
 	NumParticipants int `json:"numParticipants,omitempty"`
 
+	// +kubebuilder:default=hostPath
+	// +kubebuilder:validation:Enum=hostPath;emptyDir;pvc
+	DataVolumeType string `json:"dataVolumeType,omitempty"`
+	// Required when dataVolumeType=pvc.
+	DataVolumeClaimName string `json:"dataVolumeClaimName,omitempty"`
+
 	PrivateKeySecret SecretRef `json:"privateKeySecret,omitempty"`
 	// Optional HF token secret for model pulls.
 	HFTokenSecret *SecretRef `json:"hfTokenSecret,omitempty"`
-
-	// Optional fallback dataset path if no cluster claim key is selected.
-	// +kubebuilder:default=/data/flock-client
-	DataPath string `json:"dataPath,omitempty"`
 }
 
 // ClientSpec defines the specification for the client in federated learning.

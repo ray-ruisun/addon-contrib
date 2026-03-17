@@ -538,8 +538,15 @@ spec:
                 properties:
                   blockchainRpc:
                     type: string
-                  dataPath:
-                    default: /data/flock-client
+                  dataVolumeClaimName:
+                    description: Required when dataVolumeType=pvc.
+                    type: string
+                  dataVolumeType:
+                    default: hostPath
+                    enum:
+                    - hostPath
+                    - emptyDir
+                    - pvc
                     type: string
                   hfTokenSecret:
                     description: SecretRef defines a namespaced secret key reference.

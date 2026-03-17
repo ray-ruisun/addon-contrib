@@ -67,6 +67,8 @@ type FLockAllianceClientParams struct {
 	ClientJobNamespace     string
 	ClientJobName          string
 	ClientJobImage         string
+	DataVolumeType         string
+	DataVolumeClaimName    string
 	DataPath               string
 	RuntimeMode            string
 	UseGPU                 bool

@@ -41,9 +41,16 @@ spec:
             spec:
               volumes:
                 - name: client-data
+                  {{- if eq .DataVolumeType "pvc" }}
+                  persistentVolumeClaim:
+                    claimName: {{ .DataVolumeClaimName }}
+                  {{- else if eq .DataVolumeType "emptyDir" }}
+                  emptyDir: {}
+                  {{- else }}
                   hostPath:
                     path: {{ .DataPath }}
                     type: DirectoryOrCreate
+                  {{- end }}
               containers:
               - name: flock-alliance-client
                 image: {{ .ClientJobImage }}

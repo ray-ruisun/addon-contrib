@@ -29,8 +29,10 @@ spec:
     localSharedDir: /data/shared
     noIncentive: false
     numParticipants: 1
-    # Host folder to mount into container /data. Put datasets + .env here.
-    dataPath: /data/flock-client
+    # Data volume mode for client /data mount: hostPath | emptyDir | pvc.
+    dataVolumeType: hostPath
+    # Required only when dataVolumeType=pvc.
+    # dataVolumeClaimName: flock-client-data
     privateKeySecret:
       name: flock-alliance-secret
       key: CLIENT_PRIVATE_KEY

@@ -30,6 +30,13 @@ func TestNormalizeFLockAllianceSpec(t *testing.T) {
 	if spec.StorageBackend != flv1alpha1.FLockAllianceStorageS3 {
 		t.Fatalf("expected storage backend %q, got %q", flv1alpha1.FLockAllianceStorageS3, spec.StorageBackend)
 	}
+	if spec.DataVolumeType != flv1alpha1.FLockAllianceDataVolumeHostPath {
+		t.Fatalf(
+			"expected data volume type %q, got %q",
+			flv1alpha1.FLockAllianceDataVolumeHostPath,
+			spec.DataVolumeType,
+		)
+	}
 	if spec.PrivateKeySecret.Name == "" || spec.PrivateKeySecret.Key == "" {
 		t.Fatalf("expected non-empty private key secret defaults")
 	}
@@ -82,6 +89,44 @@ func TestValidateFLockAllianceSpec(t *testing.T) {
 				return spec
 			}(),
 			wantErr: false,
+		},
+		{
+			name: "valid emptyDir data volume",
+			spec: func() flv1alpha1.FLockAllianceSpec {
+				spec := validFLockAllianceSpec()
+				spec.DataVolumeType = flv1alpha1.FLockAllianceDataVolumeEmptyDir
+				return spec
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "valid pvc data volume",
+			spec: func() flv1alpha1.FLockAllianceSpec {
+				spec := validFLockAllianceSpec()
+				spec.DataVolumeType = flv1alpha1.FLockAllianceDataVolumePVC
+				spec.DataVolumeClaimName = "flock-shared-data"
+				return spec
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "invalid data volume type",
+			spec: func() flv1alpha1.FLockAllianceSpec {
+				spec := validFLockAllianceSpec()
+				spec.DataVolumeType = "nfs"
+				return spec
+			}(),
+			wantErr: true,
+		},
+		{
+			name: "invalid pvc data volume missing claim",
+			spec: func() flv1alpha1.FLockAllianceSpec {
+				spec := validFLockAllianceSpec()
+				spec.DataVolumeType = flv1alpha1.FLockAllianceDataVolumePVC
+				spec.DataVolumeClaimName = ""
+				return spec
+			}(),
+			wantErr: true,
 		},
 		{
 			name: "partial hf token secret",

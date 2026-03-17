@@ -13,9 +13,9 @@ const (
 	defaultFLockAllianceStorageBackend    = flv1alpha1.FLockAllianceStorageS3
 	defaultFLockAllianceLocalSharedDir    = "/data/shared"
 	defaultFLockAllianceNumParticipants   = 1
+	defaultFLockAllianceDataVolumeType    = flv1alpha1.FLockAllianceDataVolumeHostPath
 	defaultFLockAlliancePrivateSecretName = "flock-alliance-secret"
 	defaultFLockAlliancePrivateSecretKey  = "CLIENT_PRIVATE_KEY"
-	defaultFLockAllianceDataPath          = "/data/flock-client"
 )
 
 func normalizeFLockAllianceSpec(spec flv1alpha1.FLockAllianceSpec) flv1alpha1.FLockAllianceSpec {
@@ -34,14 +34,14 @@ func normalizeFLockAllianceSpec(spec flv1alpha1.FLockAllianceSpec) flv1alpha1.FL
 	if spec.NumParticipants < 1 {
 		spec.NumParticipants = defaultFLockAllianceNumParticipants
 	}
+	if strings.TrimSpace(spec.DataVolumeType) == "" {
+		spec.DataVolumeType = defaultFLockAllianceDataVolumeType
+	}
 	if strings.TrimSpace(spec.PrivateKeySecret.Name) == "" {
 		spec.PrivateKeySecret.Name = defaultFLockAlliancePrivateSecretName
 	}
 	if strings.TrimSpace(spec.PrivateKeySecret.Key) == "" {
 		spec.PrivateKeySecret.Key = defaultFLockAlliancePrivateSecretKey
-	}
-	if strings.TrimSpace(spec.DataPath) == "" {
-		spec.DataPath = defaultFLockAllianceDataPath
 	}
 	return spec
 }
@@ -59,6 +59,18 @@ func validateFLockAllianceSpec(spec flv1alpha1.FLockAllianceSpec) error {
 
 	if spec.NumParticipants < 1 {
 		return fmt.Errorf("FLockAlliance.numParticipants must be >= 1")
+	}
+	switch spec.DataVolumeType {
+	case flv1alpha1.FLockAllianceDataVolumeHostPath, flv1alpha1.FLockAllianceDataVolumeEmptyDir, flv1alpha1.FLockAllianceDataVolumePVC:
+	default:
+		return fmt.Errorf(
+			"unsupported FLockAlliance.dataVolumeType: %s (expected hostPath, emptyDir, or pvc)",
+			spec.DataVolumeType,
+		)
+	}
+	if spec.DataVolumeType == flv1alpha1.FLockAllianceDataVolumePVC &&
+		strings.TrimSpace(spec.DataVolumeClaimName) == "" {
+		return fmt.Errorf("FLockAlliance.dataVolumeClaimName is required when dataVolumeType=pvc")
 	}
 
 	if strings.TrimSpace(spec.PrivateKeySecret.Name) == "" || strings.TrimSpace(spec.PrivateKeySecret.Key) == "" {

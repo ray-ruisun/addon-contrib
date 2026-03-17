@@ -69,6 +69,10 @@ helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env'
 ```
 
+`hostPath` should be an absolute node path (for example `/data/flock-client`).
+Do not use `~` because kubelet does not expand shell home paths.
+Ensure node filesystem permissions allow kubelet and container runtime access.
+
 Place env file on each managed cluster node:
 
 ```text

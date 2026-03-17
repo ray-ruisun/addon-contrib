@@ -12,7 +12,7 @@ agent:
   dataVolume:
     # Use one of:
     # - existingClaim: bind a pre-created PVC
-    # - hostPath (default): fixed node path that includes .env + datasets
+    # - hostPath (default): absolute node path that includes .env + datasets (do not use ~)
     # - emptyDir: set both existingClaim/hostPath empty (ephemeral)
     existingClaim: ""
     hostPath: "/data/flock-client"

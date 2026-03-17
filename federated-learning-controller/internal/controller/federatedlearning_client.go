@@ -253,6 +253,8 @@ func (r *FederatedLearningReconciler) clusterWorkload(ctx context.Context, insta
 			ClientJobNamespace:     instance.Namespace,
 			ClientJobName:          fmt.Sprintf("%s-client", instance.Name),
 			ClientJobImage:         instance.Spec.Client.Image,
+			DataVolumeType:         flockAlliance.DataVolumeType,
+			DataVolumeClaimName:    flockAlliance.DataVolumeClaimName,
 			DataPath:               dataConfig,
 			RuntimeMode:            flockAlliance.RuntimeMode,
 			UseGPU:                 flockAlliance.UseGPU,
