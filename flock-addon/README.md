@@ -7,6 +7,12 @@ FLock addon deploys **FLockAlliance** to managed clusters as a direct client wor
 - Each managed cluster runs one `flock-agent` Deployment
 - Runtime configuration is loaded from a mounted node directory, usually `/data/flock-client`
 
+## Documentation
+
+- [Install FLock Addon](docs/install-flock-addon.md)
+- [Auto-Install by Placement](docs/auto-install-by-placement.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
 ## What Runs Where
 
 ### Hub cluster
@@ -567,3 +573,9 @@ Should see:
 
 - addon resources exist on the Hub
 - managed cluster addon objects appear for enabled clusters
+
+## Next Steps
+
+- Use [Install FLock Addon](docs/install-flock-addon.md) for a clean first deployment
+- Use [Troubleshooting](docs/troubleshooting.md) if the addon reaches Hub but not the managed cluster
+- Use [Auto-Install by Placement](docs/auto-install-by-placement.md) only when you want automatic cluster selection
