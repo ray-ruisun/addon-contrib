@@ -52,7 +52,7 @@ Path rules:
 
 Chart fallback image:
 
-- `ghcr.io/flock-io/fl-alliance-client:latest`
+- `ghcr.io/flock-io/fl-alliance-client:<release-tag>`
 
 Two common cases:
 
@@ -78,14 +78,14 @@ Example:
 
 ```bash
 # [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' make deploy
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' make deploy
 ```
 
 Or:
 
 ```bash
 # [Hub]
-FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:latest' make deploy
+FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:<git-sha-or-release-tag>' make deploy
 ```
 
 Recommended explicit export form:
@@ -158,22 +158,24 @@ Example publish target:
 
 ```bash
 # [FL-Alliance-Client workspace]
-make image-build IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
-make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+export IMAGE_SHA=$(git rev-parse --short=12 HEAD)
+make image-build IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' IMAGE_IMMUTABLE_TAG="$IMAGE_SHA"
+make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' IMAGE_IMMUTABLE_TAG="$IMAGE_SHA"
 echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-make image-push IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+make image-push IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' IMAGE_IMMUTABLE_TAG="$IMAGE_SHA"
 ```
 
 Check:
 
 ```bash
 # [FL-Alliance-Client workspace]
-make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' IMAGE_IMMUTABLE_TAG="$IMAGE_SHA"
 ```
 
 Should see:
 
-- local image exists with the exact tag you plan to deploy
+- local image exists for both `latest` and `$IMAGE_SHA`
+- deploy the addon with `$IMAGE_SHA`, not `latest`
 
 If you use the GitHub Actions workflow instead of local push, wait for the publish job to finish successfully before deploying the addon.
 
@@ -181,7 +183,7 @@ If you use the GitHub Actions workflow instead of local push, wait for the publi
 
 Use this path when the image already exists publicly in GHCR, for example:
 
-- `ghcr.io/flock-io/fl-alliance-client:latest`
+- `ghcr.io/flock-io/fl-alliance-client:<release-tag>`
 
 How to operate:
 
@@ -195,7 +197,7 @@ Example:
 # [Hub]
 unset IMAGE_PULL_SECRET
 export IMAGE_OWNER='flock-io'
-export IMAGE_TAG='latest'
+export IMAGE_TAG='<release-tag>'
 make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
@@ -215,7 +217,7 @@ Should see:
 
 Use this path when the image is private, for example:
 
-- `ghcr.io/ray-ruisun/fl-alliance-client:latest`
+- `ghcr.io/ray-ruisun/fl-alliance-client:<git-sha-or-release-tag>`
 
 How to operate:
 
@@ -333,7 +335,8 @@ If you want a different image owner:
 ```bash
 # [Hub]
 cd flock-addon
-IMAGE_OWNER='ray-ruisun' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+export IMAGE_SHA=$(git rev-parse --short=12 HEAD)
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
 Check:
@@ -535,7 +538,7 @@ Then redeploy from the Hub with pull secrets:
 # [Hub]
 helm upgrade --install flock-addon charts/flock-addon \
   --set image.repository='ghcr.io/ray-ruisun/fl-alliance-client' \
-  --set image.tag='latest' \
+  --set image.tag="$IMAGE_SHA" \
   --set image.pullSecrets[0]='ghcr-creds'
 ```
 

@@ -46,22 +46,24 @@ Local publish example:
 
 ```bash
 # [FL-Alliance-Client workspace]
-make image-build IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
-make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+export IMAGE_SHA=$(git rev-parse --short=12 HEAD)
+make image-build IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' IMAGE_IMMUTABLE_TAG="$IMAGE_SHA"
+make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' IMAGE_IMMUTABLE_TAG="$IMAGE_SHA"
 echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-make image-push IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+make image-push IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' IMAGE_IMMUTABLE_TAG="$IMAGE_SHA"
 ```
 
 Check:
 
 ```bash
 # [FL-Alliance-Client workspace]
-make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' IMAGE_IMMUTABLE_TAG="$IMAGE_SHA"
 ```
 
 Should see:
 
-- the exact image tag exists locally before push
+- both `latest` and `$IMAGE_SHA` exist locally before push
+- addon deployment should use `$IMAGE_SHA`
 
 If you use GitHub Actions publishing, wait for the workflow to finish before running `flock-addon` deployment.
 
@@ -71,7 +73,7 @@ If you use GitHub Actions publishing, wait for the workflow to finish before run
 
 Use this when the image is already published publicly, for example:
 
-- `ghcr.io/flock-io/fl-alliance-client:latest`
+- `ghcr.io/flock-io/fl-alliance-client:<release-tag>`
 
 How to operate:
 
@@ -85,14 +87,14 @@ Example:
 # [Hub]
 unset IMAGE_PULL_SECRET
 export IMAGE_OWNER='flock-io'
-export IMAGE_TAG='latest'
+export IMAGE_TAG='<release-tag>'
 ```
 
 ### Private Repository
 
 Use this when the image is private, for example:
 
-- `ghcr.io/ray-ruisun/fl-alliance-client:latest`
+- `ghcr.io/ray-ruisun/fl-alliance-client:<git-sha-or-release-tag>`
 
 How to operate:
 
@@ -106,7 +108,7 @@ Example:
 ```bash
 # [Hub]
 export IMAGE_OWNER='ray-ruisun'
-export IMAGE_TAG='latest'
+export IMAGE_TAG='<git-sha-or-release-tag>'
 export IMAGE_PULL_SECRET='ghcr-pull'
 ```
 
@@ -182,7 +184,8 @@ Optional image variables:
 export IMAGE_REGISTRY='ghcr.io'
 export IMAGE_OWNER='ray-ruisun'
 export IMAGE_NAME='fl-alliance-client'
-export IMAGE_TAG='latest'
+export IMAGE_SHA=$(git rev-parse --short=12 HEAD)
+export IMAGE_TAG="$IMAGE_SHA"
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
@@ -226,7 +229,7 @@ If you need a different image owner:
 ```bash
 # [Hub]
 cd flock-addon
-IMAGE_OWNER='ray-ruisun' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
 Check:
