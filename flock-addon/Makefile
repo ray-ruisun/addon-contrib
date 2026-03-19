@@ -9,6 +9,8 @@ IMAGE_OWNER ?= flock-io
 IMAGE_NAME ?= fl-alliance-client
 IMAGE_TAG ?= latest
 IMAGE_PULL_POLICY ?= Always
+USE_GPU ?= true
+GPU_RESOURCE_ENABLED ?= $(USE_GPU)
 FLOCK_ALLIANCE_IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_OWNER)/$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_PULL_SECRET ?=
 
@@ -31,6 +33,8 @@ deploy: ## Deploy FLock addon via Helm
 		--set addon.installStrategy=Manual \
 		--set placement.gpu.enabled=false \
 		--set placement.all.enabled=false \
+		--set deploymentConfig.runtime.useGpu='$(USE_GPU)' \
+		--set agent.gpuResource.enabled=$(GPU_RESOURCE_ENABLED) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
@@ -45,6 +49,8 @@ endif
 		--set addon.installStrategy=Manual \
 		--set placement.gpu.enabled=false \
 		--set placement.all.enabled=false \
+		--set deploymentConfig.runtime.useGpu='$(USE_GPU)' \
+		--set agent.gpuResource.enabled=$(GPU_RESOURCE_ENABLED) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
@@ -72,6 +78,9 @@ deploy-auto-gpu: ## Deploy with auto-install for gpu=true clusters
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set addon.installStrategy=Placements \
 		--set placement.gpu.enabled=true \
+		--set deploymentConfig.runtime.useGpu='$(USE_GPU)' \
+		--set placement.gpu.config.useGpu='$(USE_GPU)' \
+		--set agent.gpuResource.enabled=$(GPU_RESOURCE_ENABLED) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG)
 
@@ -80,6 +89,9 @@ deploy-auto-all: ## Deploy with auto-install for all clusters in global set
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set addon.installStrategy=Placements \
 		--set placement.all.enabled=true \
+		--set deploymentConfig.runtime.useGpu='$(USE_GPU)' \
+		--set placement.all.config.useGpu='$(USE_GPU)' \
+		--set agent.gpuResource.enabled=$(GPU_RESOURCE_ENABLED) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG)
 

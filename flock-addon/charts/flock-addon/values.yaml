@@ -10,6 +10,9 @@ agent:
   replicas: 1
   serviceAccountName: flock-agent
   dataPath: /data
+  gpuResource:
+    enabled: true
+    count: 1
   dataVolume:
     # Use one of:
     # - existingClaim: bind a pre-created PVC

@@ -152,3 +152,42 @@ Should see:
 - host path points to `/data/flock-client`
 - container mount path is `/data`
 - env file path is `/data/.env`
+
+## 6) Training Is Slow or GPU Seems Missing
+
+First confirm the Pod actually requests GPU resources and lands on a GPU-capable node.
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get pod -l app.kubernetes.io/name=flock-addon -o wide
+kubectl -n flock-system describe pod -l app.kubernetes.io/name=flock-addon | rg -n "nvidia.com/gpu|Node:|FailedScheduling|Warning"
+kubectl get node -o custom-columns=NAME:.metadata.name,GPU_ALLOCATABLE:.status.allocatable.nvidia\\.com/gpu
+kubectl get ds -A | rg -i "nvidia|gpu|device-plugin"
+```
+
+Should see:
+
+- container resources include `nvidia.com/gpu`
+- Pod is scheduled on a node with non-zero `GPU_ALLOCATABLE`
+- no `FailedScheduling` events caused by missing GPU resources
+- GPU device plugin DaemonSet exists and is Ready
+
+Then inspect the FLocKit subprocess log for runtime device detection:
+
+```bash
+# [Managed Cluster context]
+POD=$(kubectl -n flock-system get pod -l app.kubernetes.io/component=agent -o jsonpath='{.items[0].metadata.name}')
+kubectl -n flock-system exec "$POD" -c flock-alliance-client -- sh -lc 'f=$(ls -1t /app/output/task_outputs/process_*.log | head -n1); echo "LOG=$f"; rg -n "CUDA is available|CUDA not available|Using device/backend|device=" "$f" || true'
+```
+
+Interpretation:
+
+- If you see `CUDA is available`, GPU mapping is working.
+- If you see `CUDA not available`, the process is running CPU fallback.
+
+If you want CPU mode intentionally, redeploy with:
+
+```bash
+# [Hub]
+USE_GPU='false' GPU_RESOURCE_ENABLED='false' make deploy-testnet TASK_ADDRESS='0x...'
+```

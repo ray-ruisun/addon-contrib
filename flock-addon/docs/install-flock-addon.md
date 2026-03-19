@@ -186,6 +186,8 @@ export IMAGE_OWNER='ray-ruisun'
 export IMAGE_NAME='fl-alliance-client'
 export IMAGE_SHA=$(git rev-parse --short=12 HEAD)
 export IMAGE_TAG="$IMAGE_SHA"
+export USE_GPU='true'
+export GPU_RESOURCE_ENABLED='true'
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
@@ -229,7 +231,7 @@ If you need a different image owner:
 ```bash
 # [Hub]
 cd flock-addon
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+USE_GPU='true' GPU_RESOURCE_ENABLED='true' IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
 Check:
@@ -276,6 +278,8 @@ Should see:
 # [Managed Cluster context]
 kubectl -n flock-system get deploy,pod
 kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=100
+kubectl -n flock-system get pod -l app.kubernetes.io/name=flock-addon -o jsonpath='{range .items[*]}{.metadata.name}{"\trequest="}{.spec.containers[0].resources.requests.nvidia\.com/gpu}{"\tlimit="}{.spec.containers[0].resources.limits.nvidia\.com/gpu}{"\n"}{end}'
+kubectl get node -o custom-columns=NAME:.metadata.name,GPU_ALLOCATABLE:.status.allocatable.nvidia\\.com/gpu
 ```
 
 Should see:
@@ -284,6 +288,8 @@ Should see:
 - Pod becomes `Running`
 - logs show `FLockAlliance` startup
 - the Pod pulls the image matching `FLOCK_ALLIANCE_IMAGE`
+- Pod resources show `request=1` and `limit=1` for `nvidia.com/gpu`
+- at least one node shows non-empty `GPU_ALLOCATABLE`
 
 ## Local Chain Mode
 

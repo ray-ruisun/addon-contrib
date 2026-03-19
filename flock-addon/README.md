@@ -97,6 +97,8 @@ export IMAGE_OWNER='ray-ruisun'
 export IMAGE_NAME='fl-alliance-client'
 export IMAGE_TAG='<git-sha-or-release-tag>'
 export IMAGE_PULL_POLICY='Always'
+export USE_GPU='true'
+export GPU_RESOURCE_ENABLED='true'
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
@@ -260,6 +262,7 @@ Behavior:
 - `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` are read from each cluster node `.env`
 - `PRIVATE_KEY` and `HF_TOKEN` are read from each cluster node `.env`
 - GPU runtime is enabled by default through `deploymentConfig.runtime.useGpu=true`
+- deploy targets also request GPU resources by default (`nvidia.com/gpu=1`)
 
 ### 1) Prepare the node path
 
@@ -327,6 +330,8 @@ Run on the Hub.
 ```bash
 # [Hub]
 cd flock-addon
+export USE_GPU='true'
+export GPU_RESOURCE_ENABLED='true'
 make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
@@ -336,7 +341,7 @@ If you want a different image owner:
 # [Hub]
 cd flock-addon
 export IMAGE_SHA=$(git rev-parse --short=12 HEAD)
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+USE_GPU='true' GPU_RESOURCE_ENABLED='true' IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
 Check:
@@ -387,6 +392,8 @@ Run against the managed cluster context.
 # [Managed Cluster context]
 kubectl -n flock-system get deploy,pod
 kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=100
+kubectl -n flock-system get pod -l app.kubernetes.io/name=flock-addon -o jsonpath='{range .items[*]}{.metadata.name}{"\trequest="}{.spec.containers[0].resources.requests.nvidia\.com/gpu}{"\tlimit="}{.spec.containers[0].resources.limits.nvidia\.com/gpu}{"\n"}{end}'
+kubectl get node -o custom-columns=NAME:.metadata.name,GPU_ALLOCATABLE:.status.allocatable.nvidia\\.com/gpu
 ```
 
 Should see:
@@ -394,6 +401,15 @@ Should see:
 - `deployment/flock-agent` exists
 - Pod becomes `Running`
 - logs show `FLockAlliance` startup rather than image pull or crash errors
+- Pod resources show `request=1` and `limit=1` for `nvidia.com/gpu`
+- at least one node shows non-empty `GPU_ALLOCATABLE`
+
+If you intentionally want CPU mode:
+
+```bash
+# [Hub]
+USE_GPU='false' GPU_RESOURCE_ENABLED='false' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+```
 
 ## Local Chain Mode
 
@@ -607,6 +623,38 @@ Should see:
 
 - namespace `flock-system` exists
 - `flock-agent` Deployment exists
+
+## GPU Mapping Troubleshooting
+
+If training is unexpectedly slow, verify the addon Pod is actually bound to GPU resources.
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get pod -l app.kubernetes.io/name=flock-addon -o wide
+kubectl -n flock-system describe pod -l app.kubernetes.io/name=flock-addon | rg -n "nvidia.com/gpu|Node:|Warning|FailedScheduling"
+kubectl get node -o custom-columns=NAME:.metadata.name,GPU_ALLOCATABLE:.status.allocatable.nvidia\\.com/gpu
+kubectl get ds -A | rg -i "nvidia|gpu|device-plugin"
+```
+
+Should see:
+
+- Pod is scheduled on a node with non-zero `GPU_ALLOCATABLE`
+- container resources include `nvidia.com/gpu`
+- no `FailedScheduling` due to missing GPU resources
+- GPU device plugin DaemonSet exists and is Ready
+
+Then check FLocKit subprocess logs for device selection:
+
+```bash
+# [Managed Cluster context]
+POD=$(kubectl -n flock-system get pod -l app.kubernetes.io/component=agent -o jsonpath='{.items[0].metadata.name}')
+kubectl -n flock-system exec "$POD" -c flock-alliance-client -- sh -lc 'f=$(ls -1t /app/output/task_outputs/process_*.log | head -n1); echo "LOG=$f"; rg -n "CUDA is available|CUDA not available|Using device/backend|device=" "$f" || true'
+```
+
+Should see one of:
+
+- GPU path: `CUDA is available` and CUDA device/backend lines
+- CPU fallback: `CUDA not available` (then cluster/node GPU plugin or resource request is still not effective)
 
 ## Direct Client / FLocKit Log Troubleshooting
 
