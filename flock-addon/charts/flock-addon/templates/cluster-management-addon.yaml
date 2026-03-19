@@ -9,7 +9,7 @@ kind: ClusterManagementAddOn
 metadata:
   name: {{ .Values.addon.name }}
   annotations:
-    addon.open-cluster-management.io/lifecycle: addon.open-cluster-management
+    addon.open-cluster-management.io/lifecycle: addon-manager
 spec:
   addOnMeta:
     displayName: {{ .Values.addon.displayName }}
@@ -35,6 +35,9 @@ spec:
         namespace: {{ .Values.addon.namespace }}
         configs:
           - group: addon.open-cluster-management.io
+            resource: addontemplates
+            name: {{ .Values.addon.name }}
+          - group: addon.open-cluster-management.io
             resource: addondeploymentconfigs
             name: {{ .Values.placement.gpu.config.name }}
             namespace: {{ .Values.addon.namespace }}
@@ -42,6 +45,9 @@ spec:
       - name: {{ .Values.placement.all.name }}
         namespace: {{ .Values.addon.namespace }}
         configs:
+          - group: addon.open-cluster-management.io
+            resource: addontemplates
+            name: {{ .Values.addon.name }}
           - group: addon.open-cluster-management.io
             resource: addondeploymentconfigs
             name: {{ .Values.placement.all.config.name }}

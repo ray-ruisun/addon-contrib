@@ -14,6 +14,9 @@ all: help
 .PHONY: deploy
 deploy: ## Deploy FLock addon via Helm
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
+		--set addon.installStrategy=Manual \
+		--set placement.gpu.enabled=false \
+		--set placement.all.enabled=false \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2)
 
@@ -23,6 +26,9 @@ ifndef TASK_ADDRESS
 	$(error TASK_ADDRESS is not set. Usage: make deploy-testnet TASK_ADDRESS=0x... [RPC=https://...] [TOKEN_ADDRESS=0x...])
 endif
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
+		--set addon.installStrategy=Manual \
+		--set placement.gpu.enabled=false \
+		--set placement.all.enabled=false \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set deploymentConfig.blockchain.rpc='$(RPC)' \
@@ -56,17 +62,26 @@ deploy-auto-all: ## Deploy with auto-install for all clusters in global set
 		--set placement.all.enabled=true
 
 .PHONY: enable-addon
-enable-addon: ## Enable addon on a cluster (usage: make enable-addon CLUSTER=cluster1)
+enable-addon: ## Enable addon on a cluster (usage: make enable-addon CLUSTER=cluster1 [CONFIG=flock-addon-config])
 ifndef CLUSTER
-	$(error CLUSTER is not set. Usage: make enable-addon CLUSTER=cluster1)
+	$(error CLUSTER is not set. Usage: make enable-addon CLUSTER=cluster1 [CONFIG=flock-addon-config])
 endif
 	@echo "apiVersion: addon.open-cluster-management.io/v1alpha1" | \
 	{ cat; echo "kind: ManagedClusterAddOn"; } | \
 	{ cat; echo "metadata:"; } | \
 	{ cat; echo "  name: flock-addon"; } | \
 	{ cat; echo "  namespace: $(CLUSTER)"; } | \
+	{ cat; echo "  annotations:"; } | \
+	{ cat; echo "    addon.open-cluster-management.io/v1alpha1-install-namespace: flock-system"; } | \
 	{ cat; echo "spec:"; } | \
-	{ cat; echo "  installNamespace: flock-system"; } | \
+	{ cat; echo "  configs:"; } | \
+	{ cat; echo "    - group: addon.open-cluster-management.io"; } | \
+	{ cat; echo "      resource: addontemplates"; } | \
+	{ cat; echo "      name: flock-addon"; } | \
+	{ cat; echo "    - group: addon.open-cluster-management.io"; } | \
+	{ cat; echo "      resource: addondeploymentconfigs"; } | \
+	{ cat; echo "      name: $${CONFIG:-flock-addon-config}"; } | \
+	{ cat; echo "      namespace: $(NAMESPACE)"; } | \
 	$(KUBECTL) apply -f -
 
 .PHONY: disable-addon

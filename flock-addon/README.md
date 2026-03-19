@@ -370,9 +370,13 @@ kind: ManagedClusterAddOn
 metadata:
   name: flock-addon
   namespace: cluster1
+  annotations:
+    addon.open-cluster-management.io/v1alpha1-install-namespace: flock-system
 spec:
-  installNamespace: flock-system
   configs:
+    - group: addon.open-cluster-management.io
+      resource: addontemplates
+      name: flock-addon
     - group: addon.open-cluster-management.io
       resource: addondeploymentconfigs
       name: flock-addon-config-cluster1
@@ -398,6 +402,7 @@ kubectl -n cluster1 get manifestwork
 
 Should see:
 - `managedclusteraddon/flock-addon` exists in `cluster1` namespace
+- `spec.configs` includes `flock-addon` and `flock-addon-config`
 - status conditions progress toward healthy/available
 - one or more ManifestWork objects exist
 
