@@ -115,6 +115,38 @@ export IMAGE_PULL_SECRET='ghcr-pull'
 
 If the selected registry is private, also configure `image.pullSecrets`.
 
+## Publish To Deploy Flow
+
+Recommended end-to-end flow for a custom image:
+
+1. Publish `FL-Alliance-Client` image to GHCR.
+2. Create `ghcr-pull` on each managed cluster if the package is private.
+3. Deploy `flock-addon` from the Hub with matching image variables.
+4. Verify the managed cluster Pod is pulling the expected image.
+
+Example publish target:
+
+```bash
+# [FL-Alliance-Client workspace]
+make image-build IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+make image-push IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+```
+
+Check:
+
+```bash
+# [FL-Alliance-Client workspace]
+make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+```
+
+Should see:
+
+- local image exists with the exact tag you plan to deploy
+
+If you use the GitHub Actions workflow instead of local push, wait for the publish job to finish successfully before deploying the addon.
+
 ## Quick Start: Testnet Mode
 
 This is the default deployment mode.

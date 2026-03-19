@@ -22,6 +22,33 @@ This guide installs the FLock addon on Open Cluster Management (OCM) and deploys
 - `kubectl`, `helm`, and `make` are installed on the Hub
 - every node that may run the addon Pod has a shared host path, usually `/data/flock-client`
 
+## Image Publish Before Addon Deploy
+
+If you want to deploy a custom image, publish it first from `FL-Alliance-Client`.
+
+Local publish example:
+
+```bash
+# [FL-Alliance-Client workspace]
+make image-build IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+make image-push IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+```
+
+Check:
+
+```bash
+# [FL-Alliance-Client workspace]
+make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+```
+
+Should see:
+
+- the exact image tag exists locally before push
+
+If you use GitHub Actions publishing, wait for the workflow to finish before running `flock-addon` deployment.
+
 ## Step 1: Prepare the Node Path
 
 Run on every managed cluster node that may host the addon Pod.
@@ -105,6 +132,28 @@ If the registry is private:
 export IMAGE_PULL_SECRET='ghcr-pull'
 ```
 
+If the package is private, create the pull secret on each managed cluster before enabling the addon:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system create secret docker-registry ghcr-pull \
+  --docker-server=ghcr.io \
+  --docker-username="$GHCR_USER" \
+  --docker-password="$GHCR_PAT" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+Check:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get secret ghcr-pull
+```
+
+Should see:
+
+- secret `ghcr-pull` exists before addon rollout
+
 ```bash
 # [Hub]
 cd flock-addon
@@ -170,6 +219,7 @@ Should see:
 - `deployment/flock-agent` exists
 - Pod becomes `Running`
 - logs show `FLockAlliance` startup
+- the Pod pulls the image matching `FLOCK_ALLIANCE_IMAGE`
 
 ## Local Chain Mode
 

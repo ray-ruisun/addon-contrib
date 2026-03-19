@@ -23,6 +23,17 @@ Should see:
 - the Pod events show the exact pull failure
 - `FLOCK_ALLIANCE_IMAGE` matches the intended image
 
+Also confirm the image was actually published:
+
+```bash
+# [FL-Alliance-Client workspace]
+make image-inspect IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest'
+```
+
+Should see:
+
+- the exact tag exists locally before you expect the cluster to pull it
+
 If the image is wrong:
 
 ```bash
