@@ -8,6 +8,7 @@ IMAGE_REGISTRY ?= ghcr.io
 IMAGE_OWNER ?= flock-io
 IMAGE_NAME ?= fl-alliance-client
 IMAGE_TAG ?= latest
+IMAGE_PULL_POLICY ?= Always
 FLOCK_ALLIANCE_IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_OWNER)/$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_PULL_SECRET ?=
 
@@ -28,6 +29,7 @@ deploy: ## Deploy FLock addon via Helm
 		--set placement.all.enabled=false \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG)
 
 .PHONY: deploy-testnet
@@ -41,6 +43,7 @@ endif
 		--set placement.all.enabled=false \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
 		--set deploymentConfig.blockchain.rpc='$(RPC)' \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
@@ -65,6 +68,7 @@ deploy-auto-gpu: ## Deploy with auto-install for gpu=true clusters
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set addon.installStrategy=Placements \
 		--set placement.gpu.enabled=true \
+		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG)
 
 .PHONY: deploy-auto-all
@@ -72,6 +76,7 @@ deploy-auto-all: ## Deploy with auto-install for all clusters in global set
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set addon.installStrategy=Placements \
 		--set placement.all.enabled=true \
+		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG)
 
 .PHONY: enable-addon

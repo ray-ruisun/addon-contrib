@@ -2,7 +2,7 @@
 image:
   repository: ghcr.io/flock-io/fl-alliance-client
   tag: "latest"
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   pullSecrets: []
 
 agent:

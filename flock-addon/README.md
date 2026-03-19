@@ -95,7 +95,8 @@ Recommended explicit export form:
 export IMAGE_REGISTRY='ghcr.io'
 export IMAGE_OWNER='ray-ruisun'
 export IMAGE_NAME='fl-alliance-client'
-export IMAGE_TAG='latest'
+export IMAGE_TAG='<git-sha-or-release-tag>'
+export IMAGE_PULL_POLICY='Always'
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
@@ -116,6 +117,8 @@ kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config 
 Should see:
 
 - `FLOCK_ALLIANCE_IMAGE` matches `${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}`
+- With `IMAGE_TAG='latest'`, keep `IMAGE_PULL_POLICY='Always'` so managed clusters do not reuse an old cached image.
+- Prefer an immutable tag such as a git SHA or release tag for normal deployments.
 
 If the image is private, also set:
 
@@ -226,8 +229,9 @@ Example:
 ```bash
 # [Hub]
 export IMAGE_OWNER='ray-ruisun'
-export IMAGE_TAG='latest'
+export IMAGE_TAG='<git-sha-or-release-tag>'
 export IMAGE_PULL_SECRET='ghcr-pull'
+export IMAGE_PULL_POLICY='Always'
 make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
@@ -491,11 +495,11 @@ Should see:
 - the Pod events show the exact pull failure
 - `FLOCK_ALLIANCE_IMAGE` matches the intended image
 
-If the image is wrong, redeploy with an explicit override:
+If the image is wrong or still looks old after republishing the same tag, redeploy with an explicit override:
 
 ```bash
 # [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' IMAGE_PULL_POLICY='Always' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 make disable-addon CLUSTER=cluster1
 make enable-addon CLUSTER=cluster1
 ```
@@ -510,6 +514,7 @@ kubectl -n flock-system get deploy,pod
 Should see:
 
 - the Pod is recreated with the updated image
+- the Pod pulls the newest `latest` image instead of reusing a cached local copy
 
 If the Pod event says `unauthorized` or `denied`, the registry needs credentials.
 
