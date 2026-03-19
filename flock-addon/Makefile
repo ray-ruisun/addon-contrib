@@ -7,8 +7,13 @@ CHART_PATH ?= charts/flock-addon
 IMAGE_REGISTRY ?= ghcr.io
 IMAGE_OWNER ?= flock-io
 IMAGE_NAME ?= fl-alliance-client
-IMAGE_TAG ?= v0.1.0
+IMAGE_TAG ?= latest
 FLOCK_ALLIANCE_IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_OWNER)/$(IMAGE_NAME):$(IMAGE_TAG)
+IMAGE_PULL_SECRET ?=
+
+ifneq ($(strip $(IMAGE_PULL_SECRET)),)
+IMAGE_PULL_SECRET_ARG := --set image.pullSecrets[0]='$(IMAGE_PULL_SECRET)'
+endif
 
 .PHONY: all
 all: help
@@ -22,7 +27,8 @@ deploy: ## Deploy FLock addon via Helm
 		--set placement.gpu.enabled=false \
 		--set placement.all.enabled=false \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2)
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		$(IMAGE_PULL_SECRET_ARG)
 
 .PHONY: deploy-testnet
 deploy-testnet: ## Deploy for testnet mode (usage: make deploy-testnet TASK_ADDRESS=0x... [RPC=https://...] [TOKEN_ADDRESS=0x...])
@@ -35,6 +41,7 @@ endif
 		--set placement.all.enabled=false \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		$(IMAGE_PULL_SECRET_ARG) \
 		--set deploymentConfig.blockchain.rpc='$(RPC)' \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
@@ -57,13 +64,15 @@ undeploy: ## Remove FLock addon release
 deploy-auto-gpu: ## Deploy with auto-install for gpu=true clusters
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set addon.installStrategy=Placements \
-		--set placement.gpu.enabled=true
+		--set placement.gpu.enabled=true \
+		$(IMAGE_PULL_SECRET_ARG)
 
 .PHONY: deploy-auto-all
 deploy-auto-all: ## Deploy with auto-install for all clusters in global set
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set addon.installStrategy=Placements \
-		--set placement.all.enabled=true
+		--set placement.all.enabled=true \
+		$(IMAGE_PULL_SECRET_ARG)
 
 .PHONY: enable-addon
 enable-addon: ## Enable addon on a cluster (usage: make enable-addon CLUSTER=cluster1 [CONFIG=flock-addon-config])

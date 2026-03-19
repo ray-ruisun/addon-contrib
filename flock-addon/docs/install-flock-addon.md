@@ -94,8 +94,15 @@ Optional image variables:
 export IMAGE_REGISTRY='ghcr.io'
 export IMAGE_OWNER='ray-ruisun'
 export IMAGE_NAME='fl-alliance-client'
-export IMAGE_TAG='v0.1.0'
+export IMAGE_TAG='latest'
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
+```
+
+If the registry is private:
+
+```bash
+# [Hub]
+export IMAGE_PULL_SECRET='ghcr-pull'
 ```
 
 ```bash

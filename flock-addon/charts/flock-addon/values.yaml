@@ -1,7 +1,7 @@
 # Required by addon-contrib chart CI
 image:
   repository: ghcr.io/flock-io/fl-alliance-client
-  tag: "v0.1.0"
+  tag: "latest"
   pullPolicy: IfNotPresent
   pullSecrets: []
 

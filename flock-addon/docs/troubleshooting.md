@@ -27,7 +27,7 @@ If the image is wrong:
 
 ```bash
 # [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='v0.1.0' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 make disable-addon CLUSTER=cluster1
 make enable-addon CLUSTER=cluster1
 ```
@@ -51,7 +51,7 @@ Redeploy from the Hub:
 # [Hub]
 helm upgrade --install flock-addon charts/flock-addon \
   --set image.repository='ghcr.io/ray-ruisun/fl-alliance-client' \
-  --set image.tag='v0.1.0' \
+  --set image.tag='latest' \
   --set image.pullSecrets[0]='ghcr-creds'
 ```
 

@@ -52,28 +52,29 @@ Path rules:
 
 Chart fallback image:
 
-- `ghcr.io/flock-io/fl-alliance-client:v0.1.0`
+- `ghcr.io/flock-io/fl-alliance-client:latest`
 
 The `make` flow supports environment-variable based image overrides:
 
 - `IMAGE_REGISTRY`, default `ghcr.io`
 - `IMAGE_OWNER`, default `flock-io`
 - `IMAGE_NAME`, default `fl-alliance-client`
-- `IMAGE_TAG`, default `v0.1.0`
+- `IMAGE_TAG`, default `latest`
+- `IMAGE_PULL_SECRET`, optional managed-cluster image pull secret name
 - `FLOCK_ALLIANCE_IMAGE`, overrides all of the above
 
 Example:
 
 ```bash
 # [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='v0.1.0' make deploy
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' make deploy
 ```
 
 Or:
 
 ```bash
 # [Hub]
-FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0' make deploy
+FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:latest' make deploy
 ```
 
 Recommended explicit export form:
@@ -83,7 +84,7 @@ Recommended explicit export form:
 export IMAGE_REGISTRY='ghcr.io'
 export IMAGE_OWNER='ray-ruisun'
 export IMAGE_NAME='fl-alliance-client'
-export IMAGE_TAG='v0.1.0'
+export IMAGE_TAG='latest'
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
@@ -104,6 +105,13 @@ kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config 
 Should see:
 
 - `FLOCK_ALLIANCE_IMAGE` matches `${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}`
+
+If the image is private, also set:
+
+```bash
+# [Hub]
+export IMAGE_PULL_SECRET='ghcr-pull'
+```
 
 If the selected registry is private, also configure `image.pullSecrets`.
 
@@ -358,7 +366,7 @@ If the image is wrong, redeploy with an explicit override:
 
 ```bash
 # [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='v0.1.0' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='latest' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 make disable-addon CLUSTER=cluster1
 make enable-addon CLUSTER=cluster1
 ```
@@ -393,7 +401,7 @@ Then redeploy from the Hub with pull secrets:
 # [Hub]
 helm upgrade --install flock-addon charts/flock-addon \
   --set image.repository='ghcr.io/ray-ruisun/fl-alliance-client' \
-  --set image.tag='v0.1.0' \
+  --set image.tag='latest' \
   --set image.pullSecrets[0]='ghcr-creds'
 ```
 
