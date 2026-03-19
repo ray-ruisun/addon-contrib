@@ -1,172 +1,91 @@
 # FLock Addon
 
-FLock addon deploys **FLockAlliance** on managed clusters as a **direct client** workload.
+FLock addon deploys **FLockAlliance** to managed clusters as a direct client workload through Open Cluster Management (OCM).
 
-- Runtime mode is fixed to `local` (direct Python process execution)
-- `FLocKit` is **not** deployed as an addon sidecar
+- Runtime mode is fixed to `local`
+- `FLocKit` is not deployed as a separate addon workload
+- Each managed cluster runs one `flock-agent` Deployment
+- Runtime configuration is loaded from a mounted node directory, usually `/data/flock-client`
 
-The addon uses OCM `ClusterManagementAddOn` + `AddOnTemplate` + `AddOnDeploymentConfig`
-and supports manual enablement and placement-based auto-install.
+## What Runs Where
 
-## Architecture
+### Hub cluster
 
-- One Deployment per managed cluster (`flock-agent`)
-- One container in Pod: `flock-alliance-client`
-- Shared volume mounted at `/data` (default hostPath: `/data/flock-client`, optional PVC/emptyDir)
-- Client loads env file from mounted volume (default: `/data/.env`)
+- Stores `ClusterManagementAddOn`, `AddOnTemplate`, and `AddOnDeploymentConfig`
+- Deploys or updates shared addon settings
+- Enables the addon for selected managed clusters
 
-## Prerequisites
+### Managed cluster
 
-- OCM hub + managed clusters
-- Default testnet behavior:
-  - `deploymentConfig.blockchain.taskAddress` is required at deploy/upgrade time
-  - Other chain values (for example `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`) are read from each cluster's mounted `.env`
-- If using `hostPath`, the same absolute path must be available on every schedulable node in each managed cluster
+- Receives `ManifestWork`
+- Runs `flock-agent` in namespace `flock-system`
 
-## Deploy
+### Managed cluster node
 
-Run on: **Hub cluster**.
+- Provides the mounted host path, usually `/data/flock-client`
+- Stores `.env` and any local datasets/files used by `FLockAlliance`
 
-```bash
-cd flock-addon
-make deploy
-```
+## Runtime Model
 
-Check:
+Each managed cluster gets one Pod with one container:
 
-```bash
-# [Hub]
-kubectl get clustermanagementaddon flock-addon
-kubectl -n open-cluster-management get addontemplate flock-addon
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config
-```
+- Deployment: `flock-agent`
+- Container: `flock-alliance-client`
+- Container mount path: `/data`
+- Default node path: `/data/flock-client`
+- Default env file inside container: `/data/.env`
+- Effective env file on node: `/data/flock-client/.env`
 
-Should see:
-- `clustermanagementaddon/flock-addon` exists
-- `addontemplate/flock-addon` exists
-- `addondeploymentconfig/flock-addon-config` exists
+Path rules:
 
-Default image used by this addon:
+- Do not use `~` in `hostPath`
+- Use an absolute path such as `/data/flock-client`
+- The same host path must exist on every node that may schedule the Pod
 
-- chart fallback: `ghcr.io/flock-io/fl-alliance-client:v0.1.0`
-- make-based deploy supports environment overrides for registry, owner, name, tag, or full image
-- if the selected package is private, also configure `image.pullSecrets`
+## Image Selection
 
-Environment-variable driven image selection:
+Chart fallback image:
 
-```bash
-# [Hub]
-export IMAGE_OWNER='ray-ruisun'
-make deploy
-```
+- `ghcr.io/flock-io/fl-alliance-client:v0.1.0`
 
-Or set the full image directly:
+The `make` flow supports environment-variable based image overrides:
+
+- `IMAGE_REGISTRY`, default `ghcr.io`
+- `IMAGE_OWNER`, default `flock-io`
+- `IMAGE_NAME`, default `fl-alliance-client`
+- `IMAGE_TAG`, default `v0.1.0`
+- `FLOCK_ALLIANCE_IMAGE`, overrides all of the above
+
+Example:
 
 ```bash
 # [Hub]
-export FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0'
-make deploy
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='v0.1.0' make deploy
 ```
 
-Supported variables in `make` flow:
-
-- `IMAGE_REGISTRY` default: `ghcr.io`
-- `IMAGE_OWNER` default: `flock-io`
-- `IMAGE_NAME` default: `fl-alliance-client`
-- `IMAGE_TAG` default: `v0.1.0`
-- `FLOCK_ALLIANCE_IMAGE` overrides all of the above
-
-To temporarily override the image for one deployment, use an environment variable:
+Or:
 
 ```bash
 # [Hub]
-IMAGE_OWNER='<owner>' IMAGE_TAG='<tag>' make deploy
+FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0' make deploy
 ```
 
-Or for testnet:
+If the selected registry is private, also configure `image.pullSecrets`.
 
-```bash
-# [Hub]
-IMAGE_OWNER='<owner>' IMAGE_TAG='<tag>' \
-make deploy-testnet TASK_ADDRESS='0x...'
-```
+## Quick Start: Testnet Mode
 
-You can also override directly in Helm:
+This is the default deployment mode.
 
-```bash
-# [Hub]
-helm upgrade --install flock-addon charts/flock-addon \
-  --set image.repository='ghcr.io/<owner>/fl-alliance-client' \
-  --set image.tag='<tag>'
-```
+Behavior:
 
-If the image registry requires authentication, also pass pull secrets:
+- `TASK_ADDRESS` must be passed from the Hub at deploy time
+- `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` are read from each cluster node `.env`
+- `PRIVATE_KEY` and `HF_TOKEN` are read from each cluster node `.env`
+- GPU runtime is enabled by default through `deploymentConfig.runtime.useGpu=true`
 
-```bash
-# [Hub]
-helm upgrade --install flock-addon charts/flock-addon \
-  --set image.repository='ghcr.io/<owner>/fl-alliance-client' \
-  --set image.tag='<tag>' \
-  --set image.pullSecrets[0]='ghcr-creds'
-```
+### 1) Prepare the node path
 
-For testnet onchain mode, use `make deploy-testnet` (it requires `TASK_ADDRESS`).
-
-Override shared addon fields at deploy time:
-
-```bash
-# [Hub]
-helm upgrade --install flock-addon charts/flock-addon \
-  --set deploymentConfig.storage.backend='local' \
-  --set deploymentConfig.storage.localSharedDir='/data/shared'
-```
-
-For multi-cluster deployments:
-
-- Testnet default pattern:
-  - Set only `deploymentConfig.blockchain.taskAddress` from Helm values
-  - Keep `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` in each cluster's mounted `.env`
-- If you want fully centralized chain settings, you can also set
-  `deploymentConfig.blockchain.rpc/tokenAddress` in Helm values.
-
-For `deploymentConfig.storage.backend=local`, all participants must see the same
-shared filesystem path (for example via NFS-backed PVC mounted in each cluster).
-Set `agent.dataVolume.existingClaim=<rwx-claim>` (or `hostPath` for single-node dev).
-
-## Chain Settings
-
-### 1) Common Settings (Both Modes)
-
-`flock-alliance-client` loads `/data/.env` at startup by default.
-
-- path control: `deploymentConfig.runtime.flockAllianceEnvFile`
-- default value: `/data/.env`
-
-Example with hostPath:
-
-```bash
-# [Hub]
-helm upgrade --install flock-addon charts/flock-addon \
-  --set agent.dataVolume.hostPath='/data/flock-client'
-```
-
-Path mapping rules:
-
-- Node path (host filesystem): `HOST_DATA_PATH` (default from chart `agent.dataVolume.hostPath`)
-- Container mount path: always `/data`
-- Env file path inside container: `FLOCK_ALLIANCE_ENV_FILE` (default `/data/.env`)
-- Effective `.env` on node: `${HOST_DATA_PATH}/.env`
-- Recommended node `.env` path: `/data/flock-client/.env`
-
-Important:
-- Keep `FLOCK_ALLIANCE_ENV_FILE` as `/data/.env` (container path).
-- Put the actual file on node at `/data/flock-client/.env` (host path).
-
-`hostPath` should be an absolute node path (for example `/data/flock-client`).
-Do not use `~` because kubelet does not expand shell home paths.
-Ensure node filesystem permissions allow kubelet and container runtime access.
-
-Prepare this directory on every node that may run the pod:
+Run on every managed cluster node that may host the addon Pod.
 
 ```bash
 # [Each Managed Cluster Node]
@@ -176,70 +95,177 @@ sudo chown -R ubuntu:ubuntu /data/flock-client
 sudo chmod -R u+rwX /data/flock-client
 ```
 
-If your login user is not `ubuntu`, replace `ubuntu:ubuntu` with your actual
-user/group.
+Check:
 
-Place env file on each managed cluster node:
+```bash
+# [Each Managed Cluster Node]
+ls -ld /data /data/flock-client
+```
+
+Should see:
+
+- `/data` exists
+- `/data/flock-client` exists
+- your login user can read and write `/data/flock-client`
+
+If your login user is not `ubuntu`, replace `ubuntu:ubuntu` with your actual user and group.
+
+### 2) Create the node `.env`
+
+Create this file on every managed cluster node:
 
 ```text
 /data/flock-client/.env
 ```
 
-Common `.env` template:
+Example testnet `.env`:
 
 ```dotenv
 PRIVATE_KEY=0x...
 HF_TOKEN=hf_...
-# Optional per-node overrides:
-# For default testnet flow, set RPC + TOKEN here.
-# BLOCKCHAIN_RPC=
-# TOKEN_ADDRESS=
-# STORAGE_BACKEND=s3
-# LOCAL_STORAGE_DIR=/data/shared
+BLOCKCHAIN_RPC=https://sepolia.base.org
+TOKEN_ADDRESS=0x...
+STORAGE_BACKEND=s3
+LOCAL_STORAGE_DIR=/data/shared
 ```
 
-Notes:
+Check:
 
-- `PRIVATE_KEY` and `HF_TOKEN` are loaded from mounted `.env`.
-- In testnet mode, `TASK_ADDRESS` should be passed from deployment settings per run.
+```bash
+# [Each Managed Cluster Node]
+ls -l /data/flock-client/.env
+sed -n '1,20p' /data/flock-client/.env
+```
 
-### 2) Testnet Onchain Mode
+Should see:
 
-Use a public testnet RPC and testnet contract addresses.
+- `.env` exists at `/data/flock-client/.env`
+- required keys are present
 
-Default rule in this addon:
+### 3) Deploy the addon definition on the Hub
 
-- `taskAddress` is required from deployment settings
-- `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` are read from each cluster's mounted `.env`
-- GPU is enabled by default (`deploymentConfig.runtime.useGpu=true`)
-
-Testnet deploy command:
+Run on the Hub.
 
 ```bash
 # [Hub]
-helm upgrade --install flock-addon charts/flock-addon \
-  --set agent.dataVolume.hostPath='/data/flock-client' \
-  --set deploymentConfig.blockchain.taskAddress='0x47B0397C6ae306002788D093b29bcD2EDAd19924' \
-  --set deploymentConfig.storage.backend='s3'
+cd flock-addon
+make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+```
+
+If you want a different image owner:
+
+```bash
+# [Hub]
+cd flock-addon
+IMAGE_OWNER='ray-ruisun' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
 Check:
 
 ```bash
 # [Hub]
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|STORAGE_BACKEND|value"
+kubectl get clustermanagementaddon flock-addon
+kubectl -n open-cluster-management get addontemplate flock-addon
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|FLOCK_ALLIANCE_IMAGE|value"
 ```
 
 Should see:
-- `TASK_ADDRESS` value is the one you set
-- `STORAGE_BACKEND` is `s3`
 
-Equivalent Make target:
+- `clustermanagementaddon/flock-addon` exists
+- `addontemplate/flock-addon` exists
+- `addondeploymentconfig/flock-addon-config` exists
+- `TASK_ADDRESS` matches the value you passed
+- `FLOCK_ALLIANCE_IMAGE` matches the image you expect
+
+### 4) Enable the addon on a managed cluster
+
+Run on the Hub.
 
 ```bash
 # [Hub]
-make deploy-testnet \
-  TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+make enable-addon CLUSTER=cluster1
+```
+
+Check:
+
+```bash
+# [Hub]
+kubectl -n cluster1 get managedclusteraddon flock-addon -o yaml
+kubectl -n cluster1 get manifestwork
+```
+
+Should see:
+
+- `managedclusteraddon/flock-addon` exists
+- `spec.configs` includes `flock-addon` and `flock-addon-config`
+- a `ManifestWork` for `flock-addon` appears
+
+### 5) Verify the runtime on the managed cluster
+
+Run against the managed cluster context.
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get deploy,pod
+kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=100
+```
+
+Should see:
+
+- `deployment/flock-agent` exists
+- Pod becomes `Running`
+- logs show `FLockAlliance` startup rather than image pull or crash errors
+
+## Local Chain Mode
+
+Use local chain mode only if the blockchain endpoint is reachable from the addon Pod.
+
+Important:
+
+- do not use `127.0.0.1` unless the chain runs in the same Pod
+- prefer a node IP or Kubernetes Service DNS reachable from `flock-agent`
+
+Example `.env`:
+
+```dotenv
+PRIVATE_KEY=0x...
+HF_TOKEN=hf_...
+BLOCKCHAIN_RPC=http://<node-ip-or-service>:8545
+TOKEN_ADDRESS=0x...
+TASK_ADDRESS=0x...
+STORAGE_BACKEND=local
+LOCAL_STORAGE_DIR=/data/shared
+```
+
+Deploy command:
+
+```bash
+# [Hub]
+helm upgrade --install flock-addon charts/flock-addon \
+  --set agent.dataVolume.hostPath='/data/flock-client' \
+  --set deploymentConfig.storage.backend='local' \
+  --set deploymentConfig.storage.localSharedDir='/data/shared'
+```
+
+Check:
+
+```bash
+# [Hub]
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "STORAGE_BACKEND|LOCAL_STORAGE_DIR|value"
+```
+
+Should see:
+
+- `STORAGE_BACKEND` is `local`
+- `LOCAL_STORAGE_DIR` is `/data/shared`
+
+## Update Task Address
+
+When a new onchain task is created, update only `TASK_ADDRESS`.
+
+```bash
+# [Hub]
+make update-task TASK_ADDRESS='0x<NEW_TASK_ADDRESS>'
 ```
 
 Check:
@@ -250,33 +276,38 @@ kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config 
 ```
 
 Should see:
-- deployment config includes the new `TASK_ADDRESS`
 
-To verify it is **really running** (not only configured on Hub):
+- `TASK_ADDRESS` matches the new value
+
+If the addon is already enabled, the managed cluster workload should reconcile automatically. If you want to force a refresh:
 
 ```bash
-# [Hub] confirm addon is enabled to the managed cluster
-kubectl -n <cluster-name> get managedclusteraddon flock-addon
-kubectl -n <cluster-name> get manifestwork
+# [Hub]
+make disable-addon CLUSTER=cluster1
+make enable-addon CLUSTER=cluster1
 ```
 
+Check:
+
 ```bash
-# [Managed Cluster context] confirm runtime workload
-kubectl -n flock-system get deploy,pod
-kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=100
+# [Hub]
+kubectl -n cluster1 get manifestwork
 ```
 
 Should see:
-- Hub has `managedclusteraddon/flock-addon` and related ManifestWork
-- Managed cluster has `deploy/flock-agent`
-- Pod is `Running` and logs show client startup
 
-If Pod status is `ImagePullBackOff` or `ErrImagePull`, check the image reference first:
+- the `flock-addon` ManifestWork exists after re-enable
+
+## Image Pull Troubleshooting
+
+If the managed cluster Pod is stuck in `ImagePullBackOff` or `ErrImagePull`, inspect the Pod events first.
 
 ```bash
 # [Managed Cluster context]
 kubectl -n flock-system describe pod -l app.kubernetes.io/name=flock-addon
 ```
+
+Check:
 
 ```bash
 # [Hub]
@@ -284,11 +315,33 @@ kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config 
 ```
 
 Should see:
-- Pod events show the exact image pull error
-- `FLOCK_ALLIANCE_IMAGE` matches the repository and tag you expect
 
-If the event says `unauthorized` or `denied`, the registry needs credentials.
-In that case:
+- the Pod events show the exact pull failure
+- `FLOCK_ALLIANCE_IMAGE` matches the intended image
+
+If the image is wrong, redeploy with an explicit override:
+
+```bash
+# [Hub]
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='v0.1.0' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+make disable-addon CLUSTER=cluster1
+make enable-addon CLUSTER=cluster1
+```
+
+Check:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get deploy,pod
+```
+
+Should see:
+
+- the Pod is recreated with the updated image
+
+If the Pod event says `unauthorized` or `denied`, the registry needs credentials.
+
+Create the registry secret on the managed cluster:
 
 ```bash
 # [Managed Cluster context]
@@ -298,6 +351,8 @@ kubectl -n flock-system create secret docker-registry ghcr-creds \
   --docker-password='<github-token>' \
   --docker-email='<email>'
 ```
+
+Then redeploy from the Hub with pull secrets:
 
 ```bash
 # [Hub]
@@ -316,167 +371,68 @@ kubectl -n flock-system get deploy flock-agent -o yaml | rg -n "imagePullSecrets
 ```
 
 Should see:
-- secret `ghcr-creds` exists
-- `deployment/flock-agent` references `imagePullSecrets: ghcr-creds`
 
-If the default image is not accessible, redeploy with an explicit override:
+- `ghcr-creds` exists
+- `deployment/flock-agent` references `imagePullSecrets`
+
+## OCM Distribution Troubleshooting
+
+If `make deploy-testnet` succeeds on the Hub but nothing runs on the managed cluster, check the OCM distribution chain from Hub to managed cluster.
+
+### Hub-side checks
 
 ```bash
 # [Hub]
-FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0' \
-make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+kubectl get clustermanagementaddon flock-addon
+kubectl -n cluster1 get managedclusteraddon flock-addon -o yaml
+kubectl -n cluster1 get manifestwork
 ```
 
-Then re-enable the addon to refresh the managed cluster workload:
+Should see:
+
+- `clustermanagementaddon/flock-addon` exists
+- `managedclusteraddon/flock-addon` exists in the managed cluster namespace on the Hub
+- a `ManifestWork` exists for `flock-addon`
+
+If `ManagedClusterAddOn` exists but no `ManifestWork` appears, re-enable the addon:
 
 ```bash
 # [Hub]
-make disable-addon CLUSTER=<cluster-name>
-make enable-addon CLUSTER=<cluster-name>
+make disable-addon CLUSTER=cluster1
+make enable-addon CLUSTER=cluster1
 ```
 
 Check:
 
 ```bash
+# [Hub]
+kubectl -n cluster1 get managedclusteraddon flock-addon -o yaml
+kubectl -n cluster1 get manifestwork
+```
+
+Should see:
+
+- `spec.configs` contains both `flock-addon` and `flock-addon-config`
+- `ManifestWork` appears after re-enable
+
+### Managed-cluster checks
+
+```bash
 # [Managed Cluster context]
+kubectl get ns flock-system
 kubectl -n flock-system get deploy,pod
 ```
 
 Should see:
-- `deployment/flock-agent` becomes `1/1`
-- Pod status becomes `Running`
 
-Optional: if you want to override `.env` values from hub-side settings, pass
-`RPC=...` and/or `TOKEN_ADDRESS=...` to `make deploy-testnet`.
-If you need CPU-only mode, set `--set deploymentConfig.runtime.useGpu='false'`.
+- namespace `flock-system` exists
+- `flock-agent` Deployment exists
 
-`deploymentConfig.blockchain.taskAddress` is passed at startup as a runtime
-override (equivalent to direct client `--task-address ...`).
-When `storage.backend=s3`, client uses S3 signer mode by default.
+## Per-Cluster Override
 
-When a new task is created, update only `taskAddress`:
+If one cluster needs different defaults, create a dedicated `AddOnDeploymentConfig` and reference it from that cluster's `ManagedClusterAddOn`.
 
-```bash
-# [Hub]
-helm upgrade flock-addon charts/flock-addon \
-  --reuse-values \
-  --set deploymentConfig.blockchain.taskAddress='0x<NEW_TASK_ADDRESS>'
-```
-
-Check:
-
-```bash
-# [Hub]
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
-```
-
-Should see:
-- `TASK_ADDRESS` is updated to `0x<NEW_TASK_ADDRESS>`
-
-Equivalent Make target:
-
-```bash
-# [Hub]
-make update-task TASK_ADDRESS='0x<NEW_TASK_ADDRESS>'
-```
-
-Check:
-
-```bash
-# [Hub]
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
-```
-
-Should see:
-- `TASK_ADDRESS` in deployment config matches your new value
-
-Example testnet `.env`:
-
-```dotenv
-PRIVATE_KEY=0x...
-HF_TOKEN=hf_...
-BLOCKCHAIN_RPC=https://sepolia.base.org
-TOKEN_ADDRESS=0x...
-# TASK_ADDRESS is passed by deploymentConfig.blockchain.taskAddress
-# STORAGE_BACKEND defaults to s3 in deploy-testnet
-```
-
-### 3) Local Chain Mode
-
-Use a local chain RPC and contract addresses from your local deployment.
-
-Important: do not use `127.0.0.1` unless chain runs in the same Pod.
-In most cases, use a node IP or in-cluster Service DNS reachable by the addon Pod.
-
-Example `.env`:
-
-```dotenv
-PRIVATE_KEY=0x...
-BLOCKCHAIN_RPC=http://<node-ip-or-service>:8545
-TOKEN_ADDRESS=0x...
-TASK_ADDRESS=0x...
-STORAGE_BACKEND=local
-LOCAL_STORAGE_DIR=/data/shared
-HF_TOKEN=hf_...
-```
-
-Deploy command (local storage example):
-
-```bash
-# [Hub]
-helm upgrade --install flock-addon charts/flock-addon \
-  --set agent.dataVolume.hostPath='/data/flock-client' \
-  --set deploymentConfig.storage.backend='local' \
-  --set deploymentConfig.storage.localSharedDir='/data/shared'
-```
-
-Check:
-
-```bash
-# [Hub]
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "STORAGE_BACKEND|LOCAL_STORAGE_DIR|value"
-```
-
-Should see:
-- `STORAGE_BACKEND` is `local`
-- `LOCAL_STORAGE_DIR` is `/data/shared`
-
-### CLI Mapping (Old Command -> Addon)
-
-Old direct command example:
-
-```bash
-python main.py \
-  --task-address 0x47B0397C6ae306002788D093b29bcD2EDAd19924 \
-  --dataset data/asr_sarawakmalay_whisper_format_client_ids.json \
-  --hf-token $HF_TOKEN \
-  --gpu
-```
-
-Mapping in addon deployment:
-
-- `--task-address ...` -> `deploymentConfig.blockchain.taskAddress` (hub-side shared setting)
-- `--dataset ...` -> `DATA_PATH` (set `agent.dataPath`, can be file path or directory, default `/data`)
-- `--hf-token ...` -> `HF_TOKEN` in mounted `.env`
-- `--gpu` -> default is already `deploymentConfig.runtime.useGpu=true`
-
-Priority notes:
-
-- AddOnDeploymentConfig provides defaults.
-- If env file exists, startup sourcing can override defaults.
-- Non-empty variables become CLI overrides; empty variables are not forced.
-- `FLockAlliance` priority remains: CLI overrides > environment > YAML config.
-
-## Per-Cluster Config Override
-
-If one cluster needs different defaults, create a dedicated
-`AddOnDeploymentConfig` on hub and reference it from that cluster's
-`ManagedClusterAddOn`.
-
-If one cluster uses a different node path, set `HOST_DATA_PATH` in that
-cluster's dedicated deployment config.
-
-Example dedicated config:
+Example `AddOnDeploymentConfig`:
 
 ```yaml
 apiVersion: addon.open-cluster-management.io/v1alpha1
@@ -501,7 +457,7 @@ spec:
       value: /data/flock-client
 ```
 
-Reference from `ManagedClusterAddOn`:
+Example `ManagedClusterAddOn` reference:
 
 ```yaml
 apiVersion: addon.open-cluster-management.io/v1alpha1
@@ -522,42 +478,11 @@ spec:
       namespace: open-cluster-management
 ```
 
-## Enable Addon On A Cluster
-
-Run on: **Hub cluster**.
-
-```bash
-make enable-addon CLUSTER=cluster1
-```
-
-Check:
-
-```bash
-# [Hub]
-kubectl -n cluster1 get managedclusteraddon flock-addon
-kubectl -n cluster1 get managedclusteraddon flock-addon -o yaml
-kubectl -n cluster1 get manifestwork
-```
-
-Should see:
-- `managedclusteraddon/flock-addon` exists in `cluster1` namespace
-- `spec.configs` includes `flock-addon` and `flock-addon-config`
-- status conditions progress toward healthy/available
-- one or more ManifestWork objects exist
-
-Then confirm agent runtime on managed cluster:
-
-```bash
-# [Managed Cluster context]
-kubectl -n flock-system get deploy,pod
-kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=100
-```
-
-Should see:
-- `deploy/flock-agent` exists and pod is `Running`
-- logs show `flock-alliance-client` startup
-
 ## Placement Auto-Install
+
+Use placement mode only if you want the addon to be installed automatically based on cluster labels or clustersets.
+
+### GPU placement
 
 ```bash
 # [Hub]
@@ -574,10 +499,11 @@ kubectl -n cluster1 get managedclusteraddon flock-addon
 ```
 
 Should see:
-- placement exists and targets `gpu=true` clusters
-- labeled cluster eventually gets `managedclusteraddon/flock-addon`
 
-or:
+- the placement exists
+- a labeled cluster eventually gets `managedclusteraddon/flock-addon`
+
+### All-cluster placement
 
 ```bash
 # [Hub]
@@ -593,12 +519,51 @@ kubectl -n cluster1 get managedclusteraddon flock-addon
 ```
 
 Should see:
-- placement exists and targets the configured clusterset
+
+- the placement exists
 - selected clusters eventually get `managedclusteraddon/flock-addon`
+
+## Direct CLI Mapping
+
+Old direct run:
+
+```bash
+python main.py \
+  --task-address 0x47B0397C6ae306002788D093b29bcD2EDAd19924 \
+  --dataset data/asr_sarawakmalay_whisper_format_client_ids.json \
+  --hf-token $HF_TOKEN \
+  --gpu
+```
+
+Addon mapping:
+
+- `--task-address` maps to `deploymentConfig.blockchain.taskAddress`
+- `--dataset` maps to `DATA_PATH`
+- `--hf-token` comes from node `.env`
+- `--gpu` maps to `deploymentConfig.runtime.useGpu=true`
+
+Effective priority:
+
+- CLI overrides
+- environment variables
+- YAML config defaults
 
 ## Validate Chart
 
 ```bash
+# [Hub]
 make verify
 make test-chart
 ```
+
+Check:
+
+```bash
+# [Hub]
+make status
+```
+
+Should see:
+
+- addon resources exist on the Hub
+- managed cluster addon objects appear for enabled clusters
