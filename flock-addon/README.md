@@ -25,6 +25,8 @@ and supports manual enablement and placement-based auto-install.
 
 ## Deploy
 
+Run on: **Hub cluster**.
+
 ```bash
 cd flock-addon
 make deploy
@@ -33,6 +35,7 @@ make deploy
 Check:
 
 ```bash
+# [Hub]
 kubectl get clustermanagementaddon flock-addon
 kubectl -n open-cluster-management get addontemplate flock-addon
 kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config
@@ -48,6 +51,7 @@ For testnet onchain mode, use `make deploy-testnet` (it requires `TASK_ADDRESS`)
 Override shared addon fields at deploy time:
 
 ```bash
+# [Hub]
 helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.storage.backend='local' \
   --set deploymentConfig.storage.localSharedDir='/data/shared'
@@ -77,6 +81,7 @@ Set `agent.dataVolume.existingClaim=<rwx-claim>` (or `hostPath` for single-node 
 Example with hostPath:
 
 ```bash
+# [Hub]
 helm upgrade --install flock-addon charts/flock-addon \
   --set agent.dataVolume.hostPath='/data/flock-client'
 ```
@@ -100,6 +105,7 @@ Ensure node filesystem permissions allow kubelet and container runtime access.
 Prepare this directory on every node that may run the pod:
 
 ```bash
+# [Each Managed Cluster Node]
 sudo mkdir -p /data/flock-client
 sudo chmod 755 /data
 sudo chown -R ubuntu:ubuntu /data/flock-client
@@ -145,6 +151,7 @@ Default rule in this addon:
 Testnet deploy command:
 
 ```bash
+# [Hub]
 helm upgrade --install flock-addon charts/flock-addon \
   --set agent.dataVolume.hostPath='/data/flock-client' \
   --set deploymentConfig.blockchain.taskAddress='0x47B0397C6ae306002788D093b29bcD2EDAd19924' \
@@ -154,6 +161,7 @@ helm upgrade --install flock-addon charts/flock-addon \
 Check:
 
 ```bash
+# [Hub]
 kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|STORAGE_BACKEND|value"
 ```
 
@@ -164,6 +172,7 @@ Should see:
 Equivalent Make target:
 
 ```bash
+# [Hub]
 make deploy-testnet \
   TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
@@ -171,11 +180,31 @@ make deploy-testnet \
 Check:
 
 ```bash
+# [Hub]
 kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
 ```
 
 Should see:
 - deployment config includes the new `TASK_ADDRESS`
+
+To verify it is **really running** (not only configured on Hub):
+
+```bash
+# [Hub] confirm addon is enabled to the managed cluster
+kubectl -n <cluster-name> get managedclusteraddon flock-addon
+kubectl -n <cluster-name> get manifestwork
+```
+
+```bash
+# [Managed Cluster context] confirm runtime workload
+kubectl -n flock-system get deploy,pod
+kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=100
+```
+
+Should see:
+- Hub has `managedclusteraddon/flock-addon` and related ManifestWork
+- Managed cluster has `deploy/flock-agent`
+- Pod is `Running` and logs show client startup
 
 Optional: if you want to override `.env` values from hub-side settings, pass
 `RPC=...` and/or `TOKEN_ADDRESS=...` to `make deploy-testnet`.
@@ -187,6 +216,7 @@ When `storage.backend=s3`, client uses S3 signer mode by default.
 When a new task is created, update only `taskAddress`:
 
 ```bash
+# [Hub]
 helm upgrade flock-addon charts/flock-addon \
   --reuse-values \
   --set deploymentConfig.blockchain.taskAddress='0x<NEW_TASK_ADDRESS>'
@@ -195,6 +225,7 @@ helm upgrade flock-addon charts/flock-addon \
 Check:
 
 ```bash
+# [Hub]
 kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
 ```
 
@@ -204,12 +235,14 @@ Should see:
 Equivalent Make target:
 
 ```bash
+# [Hub]
 make update-task TASK_ADDRESS='0x<NEW_TASK_ADDRESS>'
 ```
 
 Check:
 
 ```bash
+# [Hub]
 kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
 ```
 
@@ -249,6 +282,7 @@ HF_TOKEN=hf_...
 Deploy command (local storage example):
 
 ```bash
+# [Hub]
 helm upgrade --install flock-addon charts/flock-addon \
   --set agent.dataVolume.hostPath='/data/flock-client' \
   --set deploymentConfig.storage.backend='local' \
@@ -258,6 +292,7 @@ helm upgrade --install flock-addon charts/flock-addon \
 Check:
 
 ```bash
+# [Hub]
 kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "STORAGE_BACKEND|LOCAL_STORAGE_DIR|value"
 ```
 
@@ -344,6 +379,8 @@ spec:
 
 ## Enable Addon On A Cluster
 
+Run on: **Hub cluster**.
+
 ```bash
 make enable-addon CLUSTER=cluster1
 ```
@@ -351,6 +388,7 @@ make enable-addon CLUSTER=cluster1
 Check:
 
 ```bash
+# [Hub]
 kubectl -n cluster1 get managedclusteraddon flock-addon
 kubectl -n cluster1 get managedclusteraddon flock-addon -o yaml
 kubectl -n cluster1 get manifestwork
@@ -361,9 +399,22 @@ Should see:
 - status conditions progress toward healthy/available
 - one or more ManifestWork objects exist
 
+Then confirm agent runtime on managed cluster:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get deploy,pod
+kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=100
+```
+
+Should see:
+- `deploy/flock-agent` exists and pod is `Running`
+- logs show `flock-alliance-client` startup
+
 ## Placement Auto-Install
 
 ```bash
+# [Hub]
 make deploy-auto-gpu
 kubectl label managedcluster cluster1 gpu=true
 ```
@@ -371,6 +422,7 @@ kubectl label managedcluster cluster1 gpu=true
 Check:
 
 ```bash
+# [Hub]
 kubectl -n open-cluster-management get placement flock-addon-gpu-placement -o yaml
 kubectl -n cluster1 get managedclusteraddon flock-addon
 ```
@@ -382,12 +434,14 @@ Should see:
 or:
 
 ```bash
+# [Hub]
 make deploy-auto-all
 ```
 
 Check:
 
 ```bash
+# [Hub]
 kubectl -n open-cluster-management get placement flock-addon-all-placement -o yaml
 kubectl -n cluster1 get managedclusteraddon flock-addon
 ```
