@@ -301,9 +301,9 @@ or:
 make deploy-auto-all
 ```
 
-## OCM Validation Checklist
+## End-to-End Deployment Runbook (With Checks)
 
-Use these variables:
+Set shared variables first:
 
 ```bash
 export CLUSTER=cluster1
@@ -311,7 +311,49 @@ export ADDON_NS=open-cluster-management
 export INSTALL_NS=flock-system
 ```
 
-### 1) Hub Chart Install Check
+### Step 1) Prepare Node Data Directory and `.env` (Each Managed Cluster Node)
+
+Run:
+
+```bash
+sudo mkdir -p /data/flock-client
+sudo chmod 755 /data
+sudo chown -R ubuntu:ubuntu /data/flock-client
+sudo chmod -R u+rwX /data/flock-client
+cat >/data/flock-client/.env <<'EOF'
+PRIVATE_KEY=0x...
+HF_TOKEN=hf_...
+BLOCKCHAIN_RPC=https://sepolia.base.org
+TOKEN_ADDRESS=0x...
+EOF
+```
+
+Check:
+
+```bash
+ls -l /data/flock-client/.env
+sed -n '1,20p' /data/flock-client/.env
+```
+
+Should see:
+- file exists at `/data/flock-client/.env`
+- `PRIVATE_KEY`, `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS` are present
+
+### Step 2) Deploy Addon on Hub
+
+Run one of the following:
+
+```bash
+make deploy
+```
+
+or (recommended testnet mode):
+
+```bash
+make deploy-testnet TASK_ADDRESS='0x<YOUR_TASK_ADDRESS>'
+```
+
+Check:
 
 ```bash
 kubectl get clustermanagementaddon flock-addon
@@ -319,62 +361,88 @@ kubectl -n $ADDON_NS get addontemplate flock-addon
 kubectl -n $ADDON_NS get addondeploymentconfig flock-addon-config
 ```
 
-Expected:
-- `clustermanagementaddon/flock-addon` exists
-- `addontemplate/flock-addon` exists
-- `addondeploymentconfig/flock-addon-config` exists
+Should see:
+- all 3 resources exist
+- `clustermanagementaddon/flock-addon` has no fatal condition
 
-### 2) ManagedClusterAddOn Enablement Check
+### Step 3) Enable Addon on Managed Cluster
 
-If not enabled yet:
+Run:
 
 ```bash
 make enable-addon CLUSTER=$CLUSTER
 ```
 
-Then verify:
+Check:
 
 ```bash
+kubectl -n $CLUSTER get managedclusteraddon flock-addon
 kubectl -n $CLUSTER get managedclusteraddon flock-addon -o yaml
 ```
 
-Expected:
-- `status.conditions` shows progressing/installing normally
-- Eventually `Available=True` (or equivalent healthy condition set)
+Should see:
+- `managedclusteraddon/flock-addon` exists in namespace `$CLUSTER`
+- conditions progress toward healthy/available
 
-### 3) Hub Work Distribution Check
+### Step 4) Verify Hub Work Distribution
+
+Run:
 
 ```bash
 kubectl -n $CLUSTER get manifestwork
 kubectl -n $CLUSTER get manifestwork -o wide
 ```
 
-Expected:
-- at least one ManifestWork for flock addon exists
-- ManifestWork reports applied/available normally
+Check details:
 
-### 4) Managed Cluster Runtime Check
+```bash
+kubectl -n $CLUSTER get manifestwork -oyaml | rg -n "conditions|reason|message"
+```
 
-Run against the managed-cluster kubeconfig/context:
+Should see:
+- at least one ManifestWork created for flock addon
+- applied/available conditions without persistent failures
+
+### Step 5) Verify Runtime on Managed Cluster
+
+Run (against managed cluster context):
 
 ```bash
 kubectl -n $INSTALL_NS get deploy,pod
 kubectl -n $INSTALL_NS logs deploy/flock-agent -c flock-alliance-client --tail=100
 ```
 
-Expected:
+Should see:
 - `deploy/flock-agent` exists
-- Pod is `Running` and not crash-looping
-- log contains startup of `python -u main.py` with `runtime.mode=local`
-- effective values come from:
-  - task from `deploymentConfig.blockchain.taskAddress` (if set)
-  - rpc/token/private key from `/data/.env` (mapped from node `/data/flock-client/.env`)
+- Pod is `Running` (not `CrashLoopBackOff`)
+- logs show client startup (`python -u main.py`) and local runtime mode
 
-### 5) Fast Triage (When Not Healthy)
+### Step 6) Update Task Address for New Testnet Task
+
+Run:
+
+```bash
+make update-task TASK_ADDRESS='0x<NEW_TASK_ADDRESS>'
+```
+
+Check:
+
+```bash
+kubectl -n $ADDON_NS get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
+kubectl -n $INSTALL_NS logs deploy/flock-agent -c flock-alliance-client --tail=100
+```
+
+Should see:
+- deployment config reflects new `TASK_ADDRESS`
+- pod restarts or reloads and uses the new task in startup logs
+
+### Step 7) Fast Triage (If Any Step Fails)
+
+Run:
 
 ```bash
 kubectl -n $CLUSTER describe managedclusteraddon flock-addon
-kubectl -n $CLUSTER get manifestwork -oyaml | rg -n \"conditions|reason|message\"
+kubectl -n $CLUSTER get manifestwork -oyaml | rg -n "conditions|reason|message"
 kubectl -n $INSTALL_NS describe pod -l app.kubernetes.io/name=flock-addon
 kubectl -n $INSTALL_NS logs deploy/flock-agent -c flock-alliance-client --previous --tail=100
 ```
