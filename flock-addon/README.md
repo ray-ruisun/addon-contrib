@@ -46,6 +46,45 @@ Should see:
 - `addontemplate/flock-addon` exists
 - `addondeploymentconfig/flock-addon-config` exists
 
+Default image used by this addon:
+
+- `ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0`
+- if this package is private, also configure `image.pullSecrets`
+
+To temporarily override the image for one deployment, use an environment variable:
+
+```bash
+# [Hub]
+FLOCK_ALLIANCE_IMAGE='ghcr.io/<owner>/fl-alliance-client:<tag>' make deploy
+```
+
+Or for testnet:
+
+```bash
+# [Hub]
+FLOCK_ALLIANCE_IMAGE='ghcr.io/<owner>/fl-alliance-client:<tag>' \
+make deploy-testnet TASK_ADDRESS='0x...'
+```
+
+You can also override directly in Helm:
+
+```bash
+# [Hub]
+helm upgrade --install flock-addon charts/flock-addon \
+  --set image.repository='ghcr.io/<owner>/fl-alliance-client' \
+  --set image.tag='<tag>'
+```
+
+If the image registry requires authentication, also pass pull secrets:
+
+```bash
+# [Hub]
+helm upgrade --install flock-addon charts/flock-addon \
+  --set image.repository='ghcr.io/<owner>/fl-alliance-client' \
+  --set image.tag='<tag>' \
+  --set image.pullSecrets[0]='ghcr-creds'
+```
+
 For testnet onchain mode, use `make deploy-testnet` (it requires `TASK_ADDRESS`).
 
 Override shared addon fields at deploy time:
@@ -206,6 +245,81 @@ Should see:
 - Hub has `managedclusteraddon/flock-addon` and related ManifestWork
 - Managed cluster has `deploy/flock-agent`
 - Pod is `Running` and logs show client startup
+
+If Pod status is `ImagePullBackOff` or `ErrImagePull`, check the image reference first:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system describe pod -l app.kubernetes.io/name=flock-addon
+```
+
+```bash
+# [Hub]
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "FLOCK_ALLIANCE_IMAGE|value"
+```
+
+Should see:
+- Pod events show the exact image pull error
+- `FLOCK_ALLIANCE_IMAGE` matches the repository and tag you expect
+
+If the event says `unauthorized` or `denied`, the registry needs credentials.
+In that case:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system create secret docker-registry ghcr-creds \
+  --docker-server=ghcr.io \
+  --docker-username='<github-user>' \
+  --docker-password='<github-token>' \
+  --docker-email='<email>'
+```
+
+```bash
+# [Hub]
+helm upgrade --install flock-addon charts/flock-addon \
+  --set image.repository='ghcr.io/ray-ruisun/fl-alliance-client' \
+  --set image.tag='v0.1.0' \
+  --set image.pullSecrets[0]='ghcr-creds'
+```
+
+Check:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get secret ghcr-creds
+kubectl -n flock-system get deploy flock-agent -o yaml | rg -n "imagePullSecrets|ghcr-creds"
+```
+
+Should see:
+- secret `ghcr-creds` exists
+- `deployment/flock-agent` references `imagePullSecrets: ghcr-creds`
+
+If the default image is not accessible, redeploy with an explicit override:
+
+```bash
+# [Hub]
+FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0' \
+make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+```
+
+Then re-enable the addon to refresh the managed cluster workload:
+
+```bash
+# [Hub]
+make disable-addon CLUSTER=<cluster-name>
+make enable-addon CLUSTER=<cluster-name>
+```
+
+Check:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get deploy,pod
+```
+
+Should see:
+- `deployment/flock-agent` becomes `1/1`
+- Pod status becomes `Running`
 
 Optional: if you want to override `.env` values from hub-side settings, pass
 `RPC=...` and/or `TOKEN_ADDRESS=...` to `make deploy-testnet`.

@@ -4,7 +4,7 @@ NAMESPACE ?= open-cluster-management
 RELEASE_NAME ?= flock-addon
 CHART_PATH ?= charts/flock-addon
 
-FLOCK_ALLIANCE_IMAGE ?= ghcr.io/flock-io/fl-alliance-client:v0.1.0
+FLOCK_ALLIANCE_IMAGE ?= ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0
 
 .PHONY: all
 all: help
