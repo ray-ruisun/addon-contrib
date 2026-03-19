@@ -16,6 +16,10 @@ ifneq ($(strip $(IMAGE_PULL_SECRET)),)
 IMAGE_PULL_SECRET_ARG := --set image.pullSecrets[0]='$(IMAGE_PULL_SECRET)'
 endif
 
+ifeq ($(strip $(IMAGE_TAG)),)
+$(error IMAGE_TAG is empty. Set IMAGE_TAG to a git SHA or release tag before deploy, for example: export IMAGE_SHA=$$(git rev-parse --short=12 HEAD) && export IMAGE_TAG="$$IMAGE_SHA")
+endif
+
 .PHONY: all
 all: help
 
