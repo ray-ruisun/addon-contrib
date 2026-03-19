@@ -52,7 +52,7 @@ deploymentConfig:
     numParticipants: "1"
 
   runtime:
-    useGpu: "false"
+    useGpu: "true"
     # Optional env file path mounted inside the Pod for FLockAlliance.
     # Typical value when using the shared data volume: /data/.env
     flockAllianceEnvFile: "/data/.env"
@@ -76,4 +76,4 @@ placement:
     clusterSet: global
     config:
       name: flock-addon-all-config
-      useGpu: "false"
+      useGpu: "true"

@@ -147,6 +147,7 @@ Default rule in this addon:
 
 - `taskAddress` is required from deployment settings
 - `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` are read from each cluster's mounted `.env`
+- GPU is enabled by default (`deploymentConfig.runtime.useGpu=true`)
 
 Testnet deploy command:
 
@@ -208,6 +209,7 @@ Should see:
 
 Optional: if you want to override `.env` values from hub-side settings, pass
 `RPC=...` and/or `TOKEN_ADDRESS=...` to `make deploy-testnet`.
+If you need CPU-only mode, set `--set deploymentConfig.runtime.useGpu='false'`.
 
 `deploymentConfig.blockchain.taskAddress` is passed at startup as a runtime
 override (equivalent to direct client `--task-address ...`).
@@ -317,7 +319,7 @@ Mapping in addon deployment:
 - `--task-address ...` -> `deploymentConfig.blockchain.taskAddress` (hub-side shared setting)
 - `--dataset ...` -> `DATA_PATH` (set `agent.dataPath`, can be file path or directory, default `/data`)
 - `--hf-token ...` -> `HF_TOKEN` in mounted `.env`
-- `--gpu` -> `deploymentConfig.runtime.useGpu=true`
+- `--gpu` -> default is already `deploymentConfig.runtime.useGpu=true`
 
 Priority notes:
 
