@@ -163,6 +163,7 @@ kubectl -n flock-system get pod -l app.kubernetes.io/name=flock-addon -o wide
 kubectl -n flock-system describe pod -l app.kubernetes.io/name=flock-addon | rg -n "nvidia.com/gpu|Node:|FailedScheduling|Warning"
 kubectl get node -o custom-columns=NAME:.metadata.name,GPU_ALLOCATABLE:.status.allocatable.nvidia\\.com/gpu
 kubectl get ds -A | rg -i "nvidia|gpu|device-plugin"
+kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=80 | rg -n "NVIDIA device files|nvidia-smi|No NVIDIA device files"
 ```
 
 Should see:
@@ -171,6 +172,7 @@ Should see:
 - Pod is scheduled on a node with non-zero `GPU_ALLOCATABLE`
 - no `FailedScheduling` events caused by missing GPU resources
 - GPU device plugin DaemonSet exists and is Ready
+- startup logs show whether `/dev/nvidia*` exists inside the container
 
 Then inspect the FLocKit subprocess log for runtime device detection:
 
@@ -190,4 +192,15 @@ If you want CPU mode intentionally, redeploy with:
 ```bash
 # [Hub]
 USE_GPU='false' GPU_RESOURCE_ENABLED='false' make deploy-testnet TASK_ADDRESS='0x...'
+```
+
+If GPU nodes are tainted or use dedicated labels, deploy with matching scheduling hints:
+
+```bash
+# [Hub]
+helm upgrade --install flock-addon charts/flock-addon \
+  --set agent.nodeSelector.gpu=true \
+  --set 'agent.tolerations[0].key=nvidia.com/gpu' \
+  --set 'agent.tolerations[0].operator=Exists' \
+  --set 'agent.tolerations[0].effect=NoSchedule'
 ```

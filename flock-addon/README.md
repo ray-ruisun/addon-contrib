@@ -47,6 +47,7 @@ Path rules:
 - Do not use `~` in `hostPath`
 - Use an absolute path such as `/data/flock-client`
 - The same host path must exist on every node that may schedule the Pod
+- If your GPU nodes use taints or dedicated labels, set `agent.tolerations` and/or `agent.nodeSelector`
 
 ## Image Selection
 
@@ -403,6 +404,7 @@ Should see:
 - logs show `FLockAlliance` startup rather than image pull or crash errors
 - Pod resources show `request=1` and `limit=1` for `nvidia.com/gpu`
 - at least one node shows non-empty `GPU_ALLOCATABLE`
+- pod startup logs include either `NVIDIA device files detected` or `No NVIDIA device files detected in container`
 
 If you intentionally want CPU mode:
 
@@ -634,6 +636,7 @@ kubectl -n flock-system get pod -l app.kubernetes.io/name=flock-addon -o wide
 kubectl -n flock-system describe pod -l app.kubernetes.io/name=flock-addon | rg -n "nvidia.com/gpu|Node:|Warning|FailedScheduling"
 kubectl get node -o custom-columns=NAME:.metadata.name,GPU_ALLOCATABLE:.status.allocatable.nvidia\\.com/gpu
 kubectl get ds -A | rg -i "nvidia|gpu|device-plugin"
+kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=80 | rg -n "NVIDIA device files|nvidia-smi|No NVIDIA device files"
 ```
 
 Should see:
@@ -642,6 +645,7 @@ Should see:
 - container resources include `nvidia.com/gpu`
 - no `FailedScheduling` due to missing GPU resources
 - GPU device plugin DaemonSet exists and is Ready
+- startup logs confirm whether `/dev/nvidia*` is visible inside the container
 
 Then check FLocKit subprocess logs for device selection:
 
@@ -655,6 +659,17 @@ Should see one of:
 
 - GPU path: `CUDA is available` and CUDA device/backend lines
 - CPU fallback: `CUDA not available` (then cluster/node GPU plugin or resource request is still not effective)
+
+If your cluster dedicates GPU nodes with labels or taints, deploy with node placement hints, for example:
+
+```bash
+# [Hub]
+helm upgrade --install flock-addon charts/flock-addon \
+  --set agent.nodeSelector.gpu=true \
+  --set 'agent.tolerations[0].key=nvidia.com/gpu' \
+  --set 'agent.tolerations[0].operator=Exists' \
+  --set 'agent.tolerations[0].effect=NoSchedule'
+```
 
 ## Direct Client / FLocKit Log Troubleshooting
 

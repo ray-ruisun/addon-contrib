@@ -46,6 +46,18 @@ spec:
                   cluster-name: "{{`{{CLUSTER_NAME}}`}}"
               spec:
                 serviceAccountName: {{ .Values.agent.serviceAccountName }}
+                {{- with .Values.agent.nodeSelector }}
+                nodeSelector:
+                  {{- toYaml . | nindent 18 }}
+                {{- end }}
+                {{- with .Values.agent.tolerations }}
+                tolerations:
+                  {{- toYaml . | nindent 18 }}
+                {{- end }}
+                {{- with .Values.agent.affinity }}
+                affinity:
+                  {{- toYaml . | nindent 18 }}
+                {{- end }}
                 {{- if .Values.image.pullSecrets }}
                 imagePullSecrets:
                   {{- range .Values.image.pullSecrets }}
@@ -72,6 +84,20 @@ spec:
                       - "/bin/sh"
                       - "-ec"
                       - |
+                        echo "[flock-addon] startup: USE_GPU=${USE_GPU:-} TASK_ADDRESS=${TASK_ADDRESS:-}"
+                        if ls /dev/nvidia* >/dev/null 2>&1; then
+                          echo "[flock-addon] NVIDIA device files detected:"
+                          ls -l /dev/nvidia* || true
+                        else
+                          echo "[flock-addon] No NVIDIA device files detected in container"
+                        fi
+                        if command -v nvidia-smi >/dev/null 2>&1; then
+                          echo "[flock-addon] nvidia-smi:"
+                          nvidia-smi || true
+                        else
+                          echo "[flock-addon] nvidia-smi not available in image"
+                        fi
+
                         if [ -n "${FLOCK_ALLIANCE_ENV_FILE:-}" ] && [ -f "${FLOCK_ALLIANCE_ENV_FILE}" ]; then
                           set -a
                           . "${FLOCK_ALLIANCE_ENV_FILE}"

@@ -10,6 +10,9 @@ agent:
   replicas: 1
   serviceAccountName: flock-agent
   dataPath: /data
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
   gpuResource:
     enabled: true
     count: 1
