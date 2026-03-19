@@ -86,12 +86,6 @@ type FederatedLearningSpec struct {
 	FLockAlliance FLockAllianceSpec `json:"flockAlliance,omitempty"`
 }
 
-// SecretRef defines a namespaced secret key reference.
-type SecretRef struct {
-	Name string `json:"name,omitempty"`
-	Key  string `json:"key,omitempty"`
-}
-
 // FLockAllianceSpec defines FLockAlliance specific runtime settings.
 type FLockAllianceSpec struct {
 	// +kubebuilder:default=local
@@ -123,10 +117,6 @@ type FLockAllianceSpec struct {
 	DataVolumeType string `json:"dataVolumeType,omitempty"`
 	// Required when dataVolumeType=pvc.
 	DataVolumeClaimName string `json:"dataVolumeClaimName,omitempty"`
-
-	PrivateKeySecret SecretRef `json:"privateKeySecret,omitempty"`
-	// Optional HF token secret for model pulls.
-	HFTokenSecret *SecretRef `json:"hfTokenSecret,omitempty"`
 }
 
 // ClientSpec defines the specification for the client in federated learning.

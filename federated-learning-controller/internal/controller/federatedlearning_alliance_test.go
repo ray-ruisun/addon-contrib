@@ -14,10 +14,6 @@ func validFLockAllianceSpec() flv1alpha1.FLockAllianceSpec {
 		TaskAddress:     "0x0000000000000000000000000000000000000002",
 		StorageBackend:  flv1alpha1.FLockAllianceStorageS3,
 		NumParticipants: 1,
-		PrivateKeySecret: flv1alpha1.SecretRef{
-			Name: "flock-alliance-secret",
-			Key:  "CLIENT_PRIVATE_KEY",
-		},
 	}
 }
 
@@ -36,9 +32,6 @@ func TestNormalizeFLockAllianceSpec(t *testing.T) {
 			flv1alpha1.FLockAllianceDataVolumeHostPath,
 			spec.DataVolumeType,
 		)
-	}
-	if spec.PrivateKeySecret.Name == "" || spec.PrivateKeySecret.Key == "" {
-		t.Fatalf("expected non-empty private key secret defaults")
 	}
 }
 
@@ -124,15 +117,6 @@ func TestValidateFLockAllianceSpec(t *testing.T) {
 				spec := validFLockAllianceSpec()
 				spec.DataVolumeType = flv1alpha1.FLockAllianceDataVolumePVC
 				spec.DataVolumeClaimName = ""
-				return spec
-			}(),
-			wantErr: true,
-		},
-		{
-			name: "partial hf token secret",
-			spec: func() flv1alpha1.FLockAllianceSpec {
-				spec := validFLockAllianceSpec()
-				spec.HFTokenSecret = &flv1alpha1.SecretRef{Name: "flock-alliance-secret"}
 				return spec
 			}(),
 			wantErr: true,

@@ -252,16 +252,6 @@ func (r *FederatedLearningReconciler) clusterWorkload(ctx context.Context, insta
 			return err
 		}
 
-		hasHFTokenSecret := flockAlliance.HFTokenSecret != nil &&
-			flockAlliance.HFTokenSecret.Name != "" &&
-			flockAlliance.HFTokenSecret.Key != ""
-		hfSecretName := ""
-		hfSecretKey := ""
-		if hasHFTokenSecret {
-			hfSecretName = flockAlliance.HFTokenSecret.Name
-			hfSecretKey = flockAlliance.HFTokenSecret.Key
-		}
-
 		clientParams = &manifests.FLockAllianceClientParams{
 			ManifestName:           instance.Name,
 			ManifestNamespace:      clusterName,
@@ -281,11 +271,6 @@ func (r *FederatedLearningReconciler) clusterWorkload(ctx context.Context, insta
 			LocalSharedDir:         flockAlliance.LocalSharedDir,
 			NoIncentive:            flockAlliance.NoIncentive,
 			NumParticipants:        flockAlliance.NumParticipants,
-			PrivateKeySecretName:   flockAlliance.PrivateKeySecret.Name,
-			PrivateKeySecretKey:    flockAlliance.PrivateKeySecret.Key,
-			HFTokenSecretName:      hfSecretName,
-			HFTokenSecretKey:       hfSecretKey,
-			HasHFTokenSecret:       hasHFTokenSecret,
 		}
 	default:
 		return fmt.Errorf("unsupported framework: %s", instance.Spec.Framework)

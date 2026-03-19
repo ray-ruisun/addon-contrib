@@ -80,9 +80,4 @@ type FLockAllianceClientParams struct {
 	LocalSharedDir         string
 	NoIncentive            bool
 	NumParticipants        int
-	PrivateKeySecretName   string
-	PrivateKeySecretKey    string
-	HFTokenSecretName      string
-	HFTokenSecretKey       string
-	HasHFTokenSecret       bool
 }

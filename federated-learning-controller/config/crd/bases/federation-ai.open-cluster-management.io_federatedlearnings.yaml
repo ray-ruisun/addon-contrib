@@ -548,14 +548,6 @@ spec:
                     - emptyDir
                     - pvc
                     type: string
-                  hfTokenSecret:
-                    description: SecretRef defines a namespaced secret key reference.
-                    properties:
-                      key:
-                        type: string
-                      name:
-                        type: string
-                    type: object
                   localSharedDir:
                     default: /data/shared
                     type: string
@@ -566,14 +558,6 @@ spec:
                     default: 1
                     minimum: 1
                     type: integer
-                  privateKeySecret:
-                    description: SecretRef defines a namespaced secret key reference.
-                    properties:
-                      key:
-                        type: string
-                      name:
-                        type: string
-                    type: object
                   runtimeMode:
                     default: local
                     enum:

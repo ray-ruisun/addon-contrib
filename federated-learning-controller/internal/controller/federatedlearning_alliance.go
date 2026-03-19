@@ -14,8 +14,6 @@ const (
 	defaultFLockAllianceLocalSharedDir    = "/data/shared"
 	defaultFLockAllianceNumParticipants   = 1
 	defaultFLockAllianceDataVolumeType    = flv1alpha1.FLockAllianceDataVolumeHostPath
-	defaultFLockAlliancePrivateSecretName = "flock-alliance-secret"
-	defaultFLockAlliancePrivateSecretKey  = "CLIENT_PRIVATE_KEY"
 )
 
 func normalizeFLockAllianceSpec(spec flv1alpha1.FLockAllianceSpec) flv1alpha1.FLockAllianceSpec {
@@ -36,12 +34,6 @@ func normalizeFLockAllianceSpec(spec flv1alpha1.FLockAllianceSpec) flv1alpha1.FL
 	}
 	if strings.TrimSpace(spec.DataVolumeType) == "" {
 		spec.DataVolumeType = defaultFLockAllianceDataVolumeType
-	}
-	if strings.TrimSpace(spec.PrivateKeySecret.Name) == "" {
-		spec.PrivateKeySecret.Name = defaultFLockAlliancePrivateSecretName
-	}
-	if strings.TrimSpace(spec.PrivateKeySecret.Key) == "" {
-		spec.PrivateKeySecret.Key = defaultFLockAlliancePrivateSecretKey
 	}
 	return spec
 }
@@ -71,15 +63,6 @@ func validateFLockAllianceSpec(spec flv1alpha1.FLockAllianceSpec) error {
 	if spec.DataVolumeType == flv1alpha1.FLockAllianceDataVolumePVC &&
 		strings.TrimSpace(spec.DataVolumeClaimName) == "" {
 		return fmt.Errorf("FLockAlliance.dataVolumeClaimName is required when dataVolumeType=pvc")
-	}
-
-	if strings.TrimSpace(spec.PrivateKeySecret.Name) == "" || strings.TrimSpace(spec.PrivateKeySecret.Key) == "" {
-		return fmt.Errorf("FLockAlliance.privateKeySecret.name and FLockAlliance.privateKeySecret.key are required")
-	}
-	if spec.HFTokenSecret != nil {
-		if strings.TrimSpace(spec.HFTokenSecret.Name) == "" || strings.TrimSpace(spec.HFTokenSecret.Key) == "" {
-			return fmt.Errorf("FLockAlliance.hfTokenSecret must include both name and key when set")
-		}
 	}
 	return nil
 }

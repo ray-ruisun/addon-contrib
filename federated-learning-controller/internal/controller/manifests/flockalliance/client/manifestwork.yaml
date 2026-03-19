@@ -91,20 +91,8 @@ spec:
                   - "training.num_participants={{ .NumParticipants }}"
                   - "--override"
                   - "data.inputs=/data"
-                env:
-                  - name: PRIVATE_KEY
-                    valueFrom:
-                      secretKeyRef:
-                        name: {{ .PrivateKeySecretName }}
-                        key: {{ .PrivateKeySecretKey }}
-                  {{- if .HasHFTokenSecret }}
-                  - name: HF_TOKEN
-                    valueFrom:
-                      secretKeyRef:
-                        name: {{ .HFTokenSecretName }}
-                        key: {{ .HFTokenSecretKey }}
-                        optional: true
-                  {{- end }}
+                # TODO(flockalliance): if needed later, add optional Secret fallback.
+                # Current mode loads PRIVATE_KEY/HF_TOKEN from /data/.env only.
                 volumeMounts:
                   - name: client-data
                     mountPath: /data

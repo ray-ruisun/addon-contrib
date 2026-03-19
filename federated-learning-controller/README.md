@@ -204,12 +204,6 @@ spec:
     taskAddress: ""
     stake: "0"
     storageBackend: s3
-    privateKeySecret:
-      name: flock-alliance-secret
-      key: CLIENT_PRIVATE_KEY
-    hfTokenSecret:
-      name: flock-alliance-secret
-      key: HF_TOKEN
     # Mount strategy for /data in managed-cluster job: hostPath | emptyDir | pvc
     dataVolumeType: hostPath
     # Required only when dataVolumeType=pvc
@@ -225,8 +219,18 @@ spec:
   - `hostPath`: requires claim key in placement and claim value on each selected cluster
   - `emptyDir`/`pvc`: no cluster data claim required
 - Load env file from `/data/.env` (`--env-file /data/.env`)
+- `.env` should include `PRIVATE_KEY` (required) and `HF_TOKEN` (optional)
 - Read runtime values from that env file when CRD fields are empty
 - For `hostPath`, use an absolute node path (for example `/data/flock-client`), ensure kubelet can read it, and ensure that path exists on each schedulable node of selected clusters
+
+Example `/data/.env`:
+
+```dotenv
+PRIVATE_KEY=0x...
+HF_TOKEN=hf_...
+BLOCKCHAIN_RPC=https://sepolia.base.org
+TOKEN_ADDRESS=0x...
+```
 
 > **Note**: Only `NodePort` is supported in KinD clusters.
 

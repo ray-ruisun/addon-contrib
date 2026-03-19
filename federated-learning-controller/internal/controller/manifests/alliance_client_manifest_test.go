@@ -27,11 +27,6 @@ func TestFLockAllianceClientManifestRender(t *testing.T) {
 		LocalSharedDir:         "/data/shared",
 		NoIncentive:            false,
 		NumParticipants:        1,
-		PrivateKeySecretName:   "flock-alliance-secret",
-		PrivateKeySecretKey:    "CLIENT_PRIVATE_KEY",
-		HFTokenSecretName:      "flock-alliance-secret",
-		HFTokenSecretKey:       "HF_TOKEN",
-		HasHFTokenSecret:       true,
 	}
 
 	renderer := applier.NewRenderer(FLockAllianceClientFiles)
@@ -53,10 +48,13 @@ func TestFLockAllianceClientManifestRender(t *testing.T) {
 		t.Fatalf("failed to marshal object: %v", err)
 	}
 	rendered := string(raw)
-	for _, token := range []string{"--env-file", "hostPath", "CLIENT_PRIVATE_KEY", "HF_TOKEN"} {
+	for _, token := range []string{"--env-file", "hostPath"} {
 		if !strings.Contains(rendered, token) {
 			t.Fatalf("expected rendered manifest to contain %q", token)
 		}
+	}
+	if strings.Contains(rendered, "secretKeyRef") {
+		t.Fatalf("did not expect secretKeyRef in flock manifest")
 	}
 }
 
@@ -79,9 +77,6 @@ func TestFLockAllianceClientManifestRenderWithoutTokenTaskOverrides(t *testing.T
 		LocalSharedDir:       "/data/shared",
 		NoIncentive:          false,
 		NumParticipants:      1,
-		PrivateKeySecretName: "flock-alliance-secret",
-		PrivateKeySecretKey:  "CLIENT_PRIVATE_KEY",
-		HasHFTokenSecret:     false,
 	}
 
 	renderer := applier.NewRenderer(FLockAllianceClientFiles)
@@ -123,8 +118,6 @@ func TestFLockAllianceClientManifestRenderEmptyDirVolume(t *testing.T) {
 		LocalSharedDir:       "/data/shared",
 		NoIncentive:          false,
 		NumParticipants:      1,
-		PrivateKeySecretName: "flock-alliance-secret",
-		PrivateKeySecretKey:  "CLIENT_PRIVATE_KEY",
 	}
 
 	renderer := applier.NewRenderer(FLockAllianceClientFiles)
@@ -164,8 +157,6 @@ func TestFLockAllianceClientManifestRenderPVCVolume(t *testing.T) {
 		LocalSharedDir:       "/data/shared",
 		NoIncentive:          false,
 		NumParticipants:      1,
-		PrivateKeySecretName: "flock-alliance-secret",
-		PrivateKeySecretKey:  "CLIENT_PRIVATE_KEY",
 	}
 
 	renderer := applier.NewRenderer(FLockAllianceClientFiles)

@@ -21,6 +21,7 @@ spec:
   flockAlliance:
     runtimeMode: local
     useGpu: false
+    # PRIVATE_KEY/HF_TOKEN are read from /data/.env on each selected cluster.
     # Optional: if omitted, runtime can read BLOCKCHAIN_RPC from /data/.env on each cluster
     blockchainRpc: ""
     # Optional: if omitted, TOKEN_ADDRESS/TASK_ADDRESS can be read from /data/.env
@@ -35,9 +36,3 @@ spec:
     dataVolumeType: hostPath
     # Required only when dataVolumeType=pvc.
     # dataVolumeClaimName: flock-client-data
-    privateKeySecret:
-      name: flock-alliance-secret
-      key: CLIENT_PRIVATE_KEY
-    hfTokenSecret:
-      name: flock-alliance-secret
-      key: HF_TOKEN
