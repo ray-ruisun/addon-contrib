@@ -45,6 +45,8 @@ make enable-addon CLUSTER=cluster1
 
 ## 2) Registry Returns `unauthorized` or `denied`
 
+This usually means you are following the private repository path, but the managed cluster does not have a valid pull secret.
+
 Create an image pull secret on the managed cluster:
 
 ```bash

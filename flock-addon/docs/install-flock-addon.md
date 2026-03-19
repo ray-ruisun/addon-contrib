@@ -26,6 +26,22 @@ This guide installs the FLock addon on Open Cluster Management (OCM) and deploys
 
 If you want to deploy a custom image, publish it first from `FL-Alliance-Client`.
 
+This step is only needed when you are building or publishing your own image.
+If you will deploy an image that already exists in GHCR, you do not need to clone the source repository first.
+
+Source repository:
+
+- [FL-Alliance-Client](https://github.com/FLock-io/FL-Alliance-Client.git)
+
+Clone the source repository before local build or push:
+
+```bash
+# [Hub or image-build machine]
+cd ~
+git clone https://github.com/FLock-io/FL-Alliance-Client.git
+cd FL-Alliance-Client
+```
+
 Local publish example:
 
 ```bash
@@ -48,6 +64,51 @@ Should see:
 - the exact image tag exists locally before push
 
 If you use GitHub Actions publishing, wait for the workflow to finish before running `flock-addon` deployment.
+
+## Public vs Private Image Repository
+
+### Public Repository
+
+Use this when the image is already published publicly, for example:
+
+- `ghcr.io/flock-io/fl-alliance-client:latest`
+
+How to operate:
+
+- you do not need to clone `FL-Alliance-Client`
+- you do not need to create `ghcr-pull`
+- you can deploy `flock-addon` directly from the Hub
+
+Example:
+
+```bash
+# [Hub]
+unset IMAGE_PULL_SECRET
+export IMAGE_OWNER='flock-io'
+export IMAGE_TAG='latest'
+```
+
+### Private Repository
+
+Use this when the image is private, for example:
+
+- `ghcr.io/ray-ruisun/fl-alliance-client:latest`
+
+How to operate:
+
+- clone `FL-Alliance-Client` if you need local build or push
+- publish the image before addon deployment
+- create `ghcr-pull` on every managed cluster
+- export `IMAGE_PULL_SECRET='ghcr-pull'` on the Hub before deploy
+
+Example:
+
+```bash
+# [Hub]
+export IMAGE_OWNER='ray-ruisun'
+export IMAGE_TAG='latest'
+export IMAGE_PULL_SECRET='ghcr-pull'
+```
 
 ## Step 1: Prepare the Node Path
 

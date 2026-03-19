@@ -54,6 +54,17 @@ Chart fallback image:
 
 - `ghcr.io/flock-io/fl-alliance-client:latest`
 
+Two common cases:
+
+1. Public image repository:
+   - recommended default path
+   - no image pull secret required
+   - usually deploy directly from `flock-addon`
+2. Private image repository:
+   - use when testing your own unpublished or restricted image
+   - requires image publish first
+   - requires `ghcr-pull` or another image pull secret on each managed cluster
+
 The `make` flow supports environment-variable based image overrides:
 
 - `IMAGE_REGISTRY`, default `ghcr.io`
@@ -124,6 +135,22 @@ Recommended end-to-end flow for a custom image:
 3. Deploy `flock-addon` from the Hub with matching image variables.
 4. Verify the managed cluster Pod is pulling the expected image.
 
+You only need the `FL-Alliance-Client` source repository if you want to build or publish your own image.
+If you are using an already published image, you can skip the source checkout and deploy `flock-addon` directly from this repository.
+
+Source repository:
+
+- [FL-Alliance-Client](https://github.com/FLock-io/FL-Alliance-Client.git)
+
+Clone it before local image build or manual image push:
+
+```bash
+# [Hub or image-build machine]
+cd ~
+git clone https://github.com/FLock-io/FL-Alliance-Client.git
+cd FL-Alliance-Client
+```
+
 Example publish target:
 
 ```bash
@@ -146,6 +173,76 @@ Should see:
 - local image exists with the exact tag you plan to deploy
 
 If you use the GitHub Actions workflow instead of local push, wait for the publish job to finish successfully before deploying the addon.
+
+### Public Repository Path
+
+Use this path when the image already exists publicly in GHCR, for example:
+
+- `ghcr.io/flock-io/fl-alliance-client:latest`
+
+How to operate:
+
+1. Do not clone `FL-Alliance-Client` unless you want to rebuild the image.
+2. Do not create `ghcr-pull`.
+3. Deploy directly from `flock-addon`.
+
+Example:
+
+```bash
+# [Hub]
+unset IMAGE_PULL_SECRET
+export IMAGE_OWNER='flock-io'
+export IMAGE_TAG='latest'
+make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+```
+
+Check:
+
+```bash
+# [Hub]
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "FLOCK_ALLIANCE_IMAGE|value"
+```
+
+Should see:
+
+- `FLOCK_ALLIANCE_IMAGE` points to the public image
+- no extra pull-secret configuration is required
+
+### Private Repository Path
+
+Use this path when the image is private, for example:
+
+- `ghcr.io/ray-ruisun/fl-alliance-client:latest`
+
+How to operate:
+
+1. Clone `FL-Alliance-Client` if you need to build or push the image yourself.
+2. Publish the image to your private GHCR namespace.
+3. Create `ghcr-pull` on each managed cluster.
+4. Deploy `flock-addon` with `IMAGE_PULL_SECRET`.
+
+Example:
+
+```bash
+# [Hub]
+export IMAGE_OWNER='ray-ruisun'
+export IMAGE_TAG='latest'
+export IMAGE_PULL_SECRET='ghcr-pull'
+make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+```
+
+Check:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get secret ghcr-pull
+kubectl -n flock-system get deploy flock-agent -o yaml | rg -n "imagePullSecrets|ghcr-pull"
+```
+
+Should see:
+
+- `ghcr-pull` exists
+- `flock-agent` references `imagePullSecrets`
 
 ## Quick Start: Testnet Mode
 
