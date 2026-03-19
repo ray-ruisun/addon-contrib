@@ -39,6 +39,8 @@ cd flock-addon
 make deploy
 ```
 
+For testnet onchain mode, use `make deploy-testnet` (it requires `TASK_ADDRESS`).
+
 Override shared addon fields at deploy time:
 
 ```bash
@@ -109,7 +111,8 @@ Common `.env` template:
 
 ```dotenv
 HF_TOKEN=hf_...
-# Optional per-node overrides (usually keep empty for testnet shared settings):
+# Optional per-node overrides:
+# For default testnet flow, set RPC + TOKEN here.
 # BLOCKCHAIN_RPC=
 # TOKEN_ADDRESS=
 # STORAGE_BACKEND=s3
@@ -175,6 +178,7 @@ HF_TOKEN=hf_...
 BLOCKCHAIN_RPC=https://sepolia.base.org
 TOKEN_ADDRESS=0x...
 # TASK_ADDRESS is passed by deploymentConfig.blockchain.taskAddress
+# STORAGE_BACKEND defaults to s3 in deploy-testnet
 ```
 
 ### 3) Local Chain Mode

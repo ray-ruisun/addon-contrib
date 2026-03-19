@@ -22,18 +22,13 @@ deploy-testnet: ## Deploy for testnet mode (usage: make deploy-testnet TASK_ADDR
 ifndef TASK_ADDRESS
 	$(error TASK_ADDRESS is not set. Usage: make deploy-testnet TASK_ADDRESS=0x... [RPC=https://...] [TOKEN_ADDRESS=0x...])
 endif
-	@CMD="$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
+	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set deploymentConfig.blockchain.rpc='$(RPC)' \
+		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
-		--set deploymentConfig.storage.backend='s3'"; \
-	if [ -n "$(RPC)" ]; then \
-		CMD="$$CMD --set deploymentConfig.blockchain.rpc='$(RPC)'"; \
-	fi; \
-	if [ -n "$(TOKEN_ADDRESS)" ]; then \
-		CMD="$$CMD --set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)'"; \
-	fi; \
-	eval "$$CMD"
+		--set deploymentConfig.storage.backend='s3'
 
 .PHONY: update-task
 update-task: ## Update shared task address only (usage: make update-task TASK_ADDRESS=0x...)
@@ -42,8 +37,7 @@ ifndef TASK_ADDRESS
 endif
 	$(HELM) upgrade $(RELEASE_NAME) $(CHART_PATH) \
 		--reuse-values \
-		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
-		--set deploymentConfig.storage.backend='s3'
+		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
 .PHONY: undeploy
 undeploy: ## Remove FLock addon release
