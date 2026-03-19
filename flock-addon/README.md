@@ -30,6 +30,19 @@ cd flock-addon
 make deploy
 ```
 
+Check:
+
+```bash
+kubectl get clustermanagementaddon flock-addon
+kubectl -n open-cluster-management get addontemplate flock-addon
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config
+```
+
+Should see:
+- `clustermanagementaddon/flock-addon` exists
+- `addontemplate/flock-addon` exists
+- `addondeploymentconfig/flock-addon-config` exists
+
 For testnet onchain mode, use `make deploy-testnet` (it requires `TASK_ADDRESS`).
 
 Override shared addon fields at deploy time:
@@ -138,12 +151,31 @@ helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.storage.backend='s3'
 ```
 
+Check:
+
+```bash
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|STORAGE_BACKEND|value"
+```
+
+Should see:
+- `TASK_ADDRESS` value is the one you set
+- `STORAGE_BACKEND` is `s3`
+
 Equivalent Make target:
 
 ```bash
 make deploy-testnet \
   TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
+
+Check:
+
+```bash
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
+```
+
+Should see:
+- deployment config includes the new `TASK_ADDRESS`
 
 Optional: if you want to override `.env` values from hub-side settings, pass
 `RPC=...` and/or `TOKEN_ADDRESS=...` to `make deploy-testnet`.
@@ -160,11 +192,29 @@ helm upgrade flock-addon charts/flock-addon \
   --set deploymentConfig.blockchain.taskAddress='0x<NEW_TASK_ADDRESS>'
 ```
 
+Check:
+
+```bash
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
+```
+
+Should see:
+- `TASK_ADDRESS` is updated to `0x<NEW_TASK_ADDRESS>`
+
 Equivalent Make target:
 
 ```bash
 make update-task TASK_ADDRESS='0x<NEW_TASK_ADDRESS>'
 ```
+
+Check:
+
+```bash
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
+```
+
+Should see:
+- `TASK_ADDRESS` in deployment config matches your new value
 
 Example testnet `.env`:
 
@@ -204,6 +254,16 @@ helm upgrade --install flock-addon charts/flock-addon \
   --set deploymentConfig.storage.backend='local' \
   --set deploymentConfig.storage.localSharedDir='/data/shared'
 ```
+
+Check:
+
+```bash
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "STORAGE_BACKEND|LOCAL_STORAGE_DIR|value"
+```
+
+Should see:
+- `STORAGE_BACKEND` is `local`
+- `LOCAL_STORAGE_DIR` is `/data/shared`
 
 ### CLI Mapping (Old Command -> Addon)
 
@@ -288,6 +348,19 @@ spec:
 make enable-addon CLUSTER=cluster1
 ```
 
+Check:
+
+```bash
+kubectl -n cluster1 get managedclusteraddon flock-addon
+kubectl -n cluster1 get managedclusteraddon flock-addon -o yaml
+kubectl -n cluster1 get manifestwork
+```
+
+Should see:
+- `managedclusteraddon/flock-addon` exists in `cluster1` namespace
+- status conditions progress toward healthy/available
+- one or more ManifestWork objects exist
+
 ## Placement Auto-Install
 
 ```bash
@@ -295,157 +368,33 @@ make deploy-auto-gpu
 kubectl label managedcluster cluster1 gpu=true
 ```
 
+Check:
+
+```bash
+kubectl -n open-cluster-management get placement flock-addon-gpu-placement -o yaml
+kubectl -n cluster1 get managedclusteraddon flock-addon
+```
+
+Should see:
+- placement exists and targets `gpu=true` clusters
+- labeled cluster eventually gets `managedclusteraddon/flock-addon`
+
 or:
 
 ```bash
 make deploy-auto-all
 ```
 
-## End-to-End Deployment Runbook (With Checks)
-
-Set shared variables first:
-
-```bash
-export CLUSTER=cluster1
-export ADDON_NS=open-cluster-management
-export INSTALL_NS=flock-system
-```
-
-### Step 1) Prepare Node Data Directory and `.env` (Each Managed Cluster Node)
-
-Run:
-
-```bash
-sudo mkdir -p /data/flock-client
-sudo chmod 755 /data
-sudo chown -R ubuntu:ubuntu /data/flock-client
-sudo chmod -R u+rwX /data/flock-client
-cat >/data/flock-client/.env <<'EOF'
-PRIVATE_KEY=0x...
-HF_TOKEN=hf_...
-BLOCKCHAIN_RPC=https://sepolia.base.org
-TOKEN_ADDRESS=0x...
-EOF
-```
-
 Check:
 
 ```bash
-ls -l /data/flock-client/.env
-sed -n '1,20p' /data/flock-client/.env
+kubectl -n open-cluster-management get placement flock-addon-all-placement -o yaml
+kubectl -n cluster1 get managedclusteraddon flock-addon
 ```
 
 Should see:
-- file exists at `/data/flock-client/.env`
-- `PRIVATE_KEY`, `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS` are present
-
-### Step 2) Deploy Addon on Hub
-
-Run one of the following:
-
-```bash
-make deploy
-```
-
-or (recommended testnet mode):
-
-```bash
-make deploy-testnet TASK_ADDRESS='0x<YOUR_TASK_ADDRESS>'
-```
-
-Check:
-
-```bash
-kubectl get clustermanagementaddon flock-addon
-kubectl -n $ADDON_NS get addontemplate flock-addon
-kubectl -n $ADDON_NS get addondeploymentconfig flock-addon-config
-```
-
-Should see:
-- all 3 resources exist
-- `clustermanagementaddon/flock-addon` has no fatal condition
-
-### Step 3) Enable Addon on Managed Cluster
-
-Run:
-
-```bash
-make enable-addon CLUSTER=$CLUSTER
-```
-
-Check:
-
-```bash
-kubectl -n $CLUSTER get managedclusteraddon flock-addon
-kubectl -n $CLUSTER get managedclusteraddon flock-addon -o yaml
-```
-
-Should see:
-- `managedclusteraddon/flock-addon` exists in namespace `$CLUSTER`
-- conditions progress toward healthy/available
-
-### Step 4) Verify Hub Work Distribution
-
-Run:
-
-```bash
-kubectl -n $CLUSTER get manifestwork
-kubectl -n $CLUSTER get manifestwork -o wide
-```
-
-Check details:
-
-```bash
-kubectl -n $CLUSTER get manifestwork -oyaml | rg -n "conditions|reason|message"
-```
-
-Should see:
-- at least one ManifestWork created for flock addon
-- applied/available conditions without persistent failures
-
-### Step 5) Verify Runtime on Managed Cluster
-
-Run (against managed cluster context):
-
-```bash
-kubectl -n $INSTALL_NS get deploy,pod
-kubectl -n $INSTALL_NS logs deploy/flock-agent -c flock-alliance-client --tail=100
-```
-
-Should see:
-- `deploy/flock-agent` exists
-- Pod is `Running` (not `CrashLoopBackOff`)
-- logs show client startup (`python -u main.py`) and local runtime mode
-
-### Step 6) Update Task Address for New Testnet Task
-
-Run:
-
-```bash
-make update-task TASK_ADDRESS='0x<NEW_TASK_ADDRESS>'
-```
-
-Check:
-
-```bash
-kubectl -n $ADDON_NS get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|value"
-kubectl -n $INSTALL_NS logs deploy/flock-agent -c flock-alliance-client --tail=100
-```
-
-Should see:
-- deployment config reflects new `TASK_ADDRESS`
-- pod restarts or reloads and uses the new task in startup logs
-
-### Step 7) Fast Triage (If Any Step Fails)
-
-Run:
-
-```bash
-kubectl -n $CLUSTER describe managedclusteraddon flock-addon
-kubectl -n $CLUSTER get manifestwork -oyaml | rg -n "conditions|reason|message"
-kubectl -n $INSTALL_NS describe pod -l app.kubernetes.io/name=flock-addon
-kubectl -n $INSTALL_NS logs deploy/flock-agent -c flock-alliance-client --previous --tail=100
-```
+- placement exists and targets the configured clusterset
+- selected clusters eventually get `managedclusteraddon/flock-addon`
 
 ## Validate Chart
 
