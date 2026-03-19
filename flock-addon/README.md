@@ -65,8 +65,7 @@ Example with hostPath:
 
 ```bash
 helm upgrade --install flock-addon charts/flock-addon \
-  --set agent.dataVolume.hostPath='/data/flock-client' \
-  --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env'
+  --set agent.dataVolume.hostPath='/data/flock-client'
 ```
 
 Path mapping rules:
@@ -75,6 +74,11 @@ Path mapping rules:
 - Container mount path: always `/data`
 - Env file path inside container: `FLOCK_ALLIANCE_ENV_FILE` (default `/data/.env`)
 - Effective `.env` on node: `${HOST_DATA_PATH}/.env`
+- Recommended node `.env` path: `/data/flock-client/.env`
+
+Important:
+- Keep `FLOCK_ALLIANCE_ENV_FILE` as `/data/.env` (container path).
+- Put the actual file on node at `/data/flock-client/.env` (host path).
 
 `hostPath` should be an absolute node path (for example `/data/flock-client`).
 Do not use `~` because kubelet does not expand shell home paths.
@@ -130,7 +134,6 @@ Testnet deploy command:
 ```bash
 helm upgrade --install flock-addon charts/flock-addon \
   --set agent.dataVolume.hostPath='/data/flock-client' \
-  --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env' \
   --set deploymentConfig.blockchain.taskAddress='0x47B0397C6ae306002788D093b29bcD2EDAd19924' \
   --set deploymentConfig.storage.backend='s3'
 ```
@@ -198,7 +201,6 @@ Deploy command (local storage example):
 ```bash
 helm upgrade --install flock-addon charts/flock-addon \
   --set agent.dataVolume.hostPath='/data/flock-client' \
-  --set deploymentConfig.runtime.flockAllianceEnvFile='/data/.env' \
   --set deploymentConfig.storage.backend='local' \
   --set deploymentConfig.storage.localSharedDir='/data/shared'
 ```
@@ -301,21 +303,81 @@ make deploy-auto-all
 
 ## OCM Validation Checklist
 
-After enabling on a managed cluster:
+Use these variables:
 
 ```bash
-kubectl get clustermanagementaddon flock-addon -o yaml
-kubectl -n cluster1 get managedclusteraddon flock-addon -o yaml
-kubectl -n flock-system get deploy,pod
-kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=100
+export CLUSTER=cluster1
+export ADDON_NS=open-cluster-management
+export INSTALL_NS=flock-system
 ```
 
-What to verify:
+### 1) Hub Chart Install Check
 
-- `ManagedClusterAddOn` condition shows install/available progressing normally.
-- Pod runs `flock-alliance-client` successfully.
-- Log shows `runtime.mode=local`.
-- If `.env` is mounted, runtime uses expected RPC/address/data-path values.
+```bash
+kubectl get clustermanagementaddon flock-addon
+kubectl -n $ADDON_NS get addontemplate flock-addon
+kubectl -n $ADDON_NS get addondeploymentconfig flock-addon-config
+```
+
+Expected:
+- `clustermanagementaddon/flock-addon` exists
+- `addontemplate/flock-addon` exists
+- `addondeploymentconfig/flock-addon-config` exists
+
+### 2) ManagedClusterAddOn Enablement Check
+
+If not enabled yet:
+
+```bash
+make enable-addon CLUSTER=$CLUSTER
+```
+
+Then verify:
+
+```bash
+kubectl -n $CLUSTER get managedclusteraddon flock-addon -o yaml
+```
+
+Expected:
+- `status.conditions` shows progressing/installing normally
+- Eventually `Available=True` (or equivalent healthy condition set)
+
+### 3) Hub Work Distribution Check
+
+```bash
+kubectl -n $CLUSTER get manifestwork
+kubectl -n $CLUSTER get manifestwork -o wide
+```
+
+Expected:
+- at least one ManifestWork for flock addon exists
+- ManifestWork reports applied/available normally
+
+### 4) Managed Cluster Runtime Check
+
+Run against the managed-cluster kubeconfig/context:
+
+```bash
+kubectl -n $INSTALL_NS get deploy,pod
+kubectl -n $INSTALL_NS logs deploy/flock-agent -c flock-alliance-client --tail=100
+```
+
+Expected:
+- `deploy/flock-agent` exists
+- Pod is `Running` and not crash-looping
+- log contains startup of `python -u main.py` with `runtime.mode=local`
+- effective values come from:
+  - task from `deploymentConfig.blockchain.taskAddress` (if set)
+  - rpc/token/private key from `/data/.env` (mapped from node `/data/flock-client/.env`)
+
+### 5) Fast Triage (When Not Healthy)
+
+```bash
+kubectl -n $CLUSTER describe managedclusteraddon flock-addon
+kubectl -n $CLUSTER get manifestwork -oyaml | rg -n \"conditions|reason|message\"
+kubectl -n $INSTALL_NS describe pod -l app.kubernetes.io/name=flock-addon
+kubectl -n $INSTALL_NS logs deploy/flock-agent -c flock-alliance-client --previous --tail=100
+```
 
 ## Validate Chart
 
