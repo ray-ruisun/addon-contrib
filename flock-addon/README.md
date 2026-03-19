@@ -76,6 +76,35 @@ Or:
 FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0' make deploy
 ```
 
+Recommended explicit export form:
+
+```bash
+# [Hub]
+export IMAGE_REGISTRY='ghcr.io'
+export IMAGE_OWNER='ray-ruisun'
+export IMAGE_NAME='fl-alliance-client'
+export IMAGE_TAG='v0.1.0'
+export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
+```
+
+Use it for deployment:
+
+```bash
+# [Hub]
+make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+```
+
+Check:
+
+```bash
+# [Hub]
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "FLOCK_ALLIANCE_IMAGE|value"
+```
+
+Should see:
+
+- `FLOCK_ALLIANCE_IMAGE` matches `${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}`
+
 If the selected registry is private, also configure `image.pullSecrets`.
 
 ## Quick Start: Testnet Mode

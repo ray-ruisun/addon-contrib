@@ -87,6 +87,17 @@ Default testnet mode:
 - `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` are read from node `.env`
 - `PRIVATE_KEY` and `HF_TOKEN` are read from node `.env`
 
+Optional image variables:
+
+```bash
+# [Hub]
+export IMAGE_REGISTRY='ghcr.io'
+export IMAGE_OWNER='ray-ruisun'
+export IMAGE_NAME='fl-alliance-client'
+export IMAGE_TAG='v0.1.0'
+export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
+```
+
 ```bash
 # [Hub]
 cd flock-addon
