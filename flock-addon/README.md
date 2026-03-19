@@ -48,21 +48,46 @@ Should see:
 
 Default image used by this addon:
 
-- `ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0`
-- if this package is private, also configure `image.pullSecrets`
+- chart fallback: `ghcr.io/flock-io/fl-alliance-client:v0.1.0`
+- make-based deploy supports environment overrides for registry, owner, name, tag, or full image
+- if the selected package is private, also configure `image.pullSecrets`
+
+Environment-variable driven image selection:
+
+```bash
+# [Hub]
+export IMAGE_OWNER='ray-ruisun'
+make deploy
+```
+
+Or set the full image directly:
+
+```bash
+# [Hub]
+export FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:v0.1.0'
+make deploy
+```
+
+Supported variables in `make` flow:
+
+- `IMAGE_REGISTRY` default: `ghcr.io`
+- `IMAGE_OWNER` default: `flock-io`
+- `IMAGE_NAME` default: `fl-alliance-client`
+- `IMAGE_TAG` default: `v0.1.0`
+- `FLOCK_ALLIANCE_IMAGE` overrides all of the above
 
 To temporarily override the image for one deployment, use an environment variable:
 
 ```bash
 # [Hub]
-FLOCK_ALLIANCE_IMAGE='ghcr.io/<owner>/fl-alliance-client:<tag>' make deploy
+IMAGE_OWNER='<owner>' IMAGE_TAG='<tag>' make deploy
 ```
 
 Or for testnet:
 
 ```bash
 # [Hub]
-FLOCK_ALLIANCE_IMAGE='ghcr.io/<owner>/fl-alliance-client:<tag>' \
+IMAGE_OWNER='<owner>' IMAGE_TAG='<tag>' \
 make deploy-testnet TASK_ADDRESS='0x...'
 ```
 

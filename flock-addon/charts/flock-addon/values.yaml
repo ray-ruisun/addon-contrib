@@ -1,6 +1,6 @@
 # Required by addon-contrib chart CI
 image:
-  repository: ghcr.io/ray-ruisun/fl-alliance-client
+  repository: ghcr.io/flock-io/fl-alliance-client
   tag: "v0.1.0"
   pullPolicy: IfNotPresent
   pullSecrets: []
