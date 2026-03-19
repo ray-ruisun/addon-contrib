@@ -608,6 +608,88 @@ Should see:
 - namespace `flock-system` exists
 - `flock-agent` Deployment exists
 
+## Direct Client / FLocKit Log Troubleshooting
+
+When using OCM + direct client mode, `FLocKit` is started as a subprocess inside
+the same `flock-alliance-client` container. There is no separate `FLocKit` Pod.
+
+If logs stop at:
+
+- `[Proposer R*] Step 3/5: Training local model...`
+
+collect both client logs and subprocess logs from the same Pod.
+
+### 1) Find the running Pod
+
+```bash
+# [Managed Cluster context]
+POD=$(kubectl -n flock-system get pod -l app.kubernetes.io/component=agent -o jsonpath='{.items[0].metadata.name}')
+echo "$POD"
+```
+
+Check:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system get pod "$POD"
+```
+
+Should see:
+
+- a valid Pod name in `$POD`
+- Pod status is `Running` (or `CrashLoopBackOff` if it is repeatedly failing)
+
+### 2) Read FL-Alliance-Client logs
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system logs "$POD" -c flock-alliance-client --tail=200
+```
+
+Check:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system logs "$POD" -c flock-alliance-client --tail=200 | rg -n "Model process logs:|Step 3/5|timed out|Process crashed"
+```
+
+Should see:
+
+- startup lines from `FLockAlliance`
+- `Model process logs: /app/output/task_outputs/process_*.log`
+- timeout/crash hints if subprocess calls fail
+
+### 3) Read FLocKit subprocess logs inside the container
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system exec "$POD" -c flock-alliance-client -- sh -lc 'ls -lt /app/output/task_outputs | head -n 20'
+```
+
+Check:
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system exec "$POD" -c flock-alliance-client -- sh -lc 'f=$(ls -1t /app/output/task_outputs/process_*.log | head -n1); echo "LOG=$f"; tail -n 200 "$f"'
+```
+
+Should see:
+
+- latest `process_*.log` path
+- traceback or template/runtime error from `FLocKit` (if training failed)
+
+### 4) Live follow subprocess logs
+
+```bash
+# [Managed Cluster context]
+kubectl -n flock-system exec "$POD" -c flock-alliance-client -- sh -lc 'f=$(ls -1t /app/output/task_outputs/process_*.log | head -n1); tail -f "$f"'
+```
+
+Should see:
+
+- continuous training/evaluation output from `FLocKit`
+- if stalled, no new lines for a long period; if crashed, traceback appears
+
 ## Per-Cluster Override
 
 If one cluster needs different defaults, create a dedicated `AddOnDeploymentConfig` and reference it from that cluster's `ManagedClusterAddOn`.
