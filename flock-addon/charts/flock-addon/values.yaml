@@ -61,16 +61,6 @@ deploymentConfig:
     backend: "s3" # s3 | local
     localSharedDir: "/data/shared"
 
-  # Secret containing blockchain private key for FLockAlliance.
-  privateKeySecret:
-    name: flock-alliance-secret
-    key: CLIENT_PRIVATE_KEY
-
-  # Optional secret used for HF model pulls in FLockAlliance.
-  hfTokenSecret:
-    name: flock-alliance-secret
-    key: HF_TOKEN
-
 placement:
   gpu:
     enabled: false

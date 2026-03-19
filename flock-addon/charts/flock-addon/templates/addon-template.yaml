@@ -116,17 +116,8 @@ spec:
                         value: "{{`{{NUM_PARTICIPANTS}}`}}"
                       - name: FLOCK_ALLIANCE_ENV_FILE
                         value: "{{`{{FLOCK_ALLIANCE_ENV_FILE}}`}}"
-                      - name: PRIVATE_KEY
-                        valueFrom:
-                          secretKeyRef:
-                            name: "{{`{{PRIVATE_KEY_SECRET_NAME}}`}}"
-                            key: "{{`{{PRIVATE_KEY_SECRET_KEY}}`}}"
-                      - name: HF_TOKEN
-                        valueFrom:
-                          secretKeyRef:
-                            name: "{{`{{HF_TOKEN_SECRET_NAME}}`}}"
-                            key: "{{`{{HF_TOKEN_SECRET_KEY}}`}}"
-                            optional: true
+                      # TODO(flock-addon): if needed later, add optional secret-based
+                      # fallback for PRIVATE_KEY/HF_TOKEN. Current mode uses .env only.
                     volumeMounts:
                       - name: shared-data
                         mountPath: /data

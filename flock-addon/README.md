@@ -18,19 +18,10 @@ and supports manual enablement and placement-based auto-install.
 ## Prerequisites
 
 - OCM hub + managed clusters
-- A blockchain private key secret on managed clusters
 - Default testnet behavior:
   - `deploymentConfig.blockchain.taskAddress` is required at deploy/upgrade time
   - Other chain values (for example `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`) are read from each cluster's mounted `.env`
 - If using `hostPath`, the same absolute path must be available on every schedulable node in each managed cluster
-
-Create secret in each managed cluster install namespace (default: `flock-system`):
-
-```bash
-kubectl -n flock-system create secret generic flock-alliance-secret \
-  --from-literal=CLIENT_PRIVATE_KEY='0x...' \
-  --from-literal=HF_TOKEN='hf_...'
-```
 
 ## Deploy
 
@@ -110,6 +101,7 @@ Place env file on each managed cluster node:
 Common `.env` template:
 
 ```dotenv
+PRIVATE_KEY=0x...
 HF_TOKEN=hf_...
 # Optional per-node overrides:
 # For default testnet flow, set RPC + TOKEN here.
@@ -121,7 +113,7 @@ HF_TOKEN=hf_...
 
 Notes:
 
-- `PRIVATE_KEY` is injected from Kubernetes Secret (`flock-alliance-secret`), not required in `.env`.
+- `PRIVATE_KEY` and `HF_TOKEN` are loaded from mounted `.env`.
 - In testnet mode, `TASK_ADDRESS` should be passed from deployment settings per run.
 
 ### 2) Testnet Onchain Mode
@@ -174,6 +166,7 @@ make update-task TASK_ADDRESS='0x<NEW_TASK_ADDRESS>'
 Example testnet `.env`:
 
 ```dotenv
+PRIVATE_KEY=0x...
 HF_TOKEN=hf_...
 BLOCKCHAIN_RPC=https://sepolia.base.org
 TOKEN_ADDRESS=0x...
@@ -191,6 +184,7 @@ In most cases, use a node IP or in-cluster Service DNS reachable by the addon Po
 Example `.env`:
 
 ```dotenv
+PRIVATE_KEY=0x...
 BLOCKCHAIN_RPC=http://<node-ip-or-service>:8545
 TOKEN_ADDRESS=0x...
 TASK_ADDRESS=0x...
@@ -225,7 +219,7 @@ Mapping in addon deployment:
 
 - `--task-address ...` -> `deploymentConfig.blockchain.taskAddress` (hub-side shared setting)
 - `--dataset ...` -> `DATA_PATH` (set `agent.dataPath`, can be file path or directory, default `/data`)
-- `--hf-token ...` -> `HF_TOKEN` secret key (`flock-alliance-secret/HF_TOKEN`) or `.env`
+- `--hf-token ...` -> `HF_TOKEN` in mounted `.env`
 - `--gpu` -> `deploymentConfig.runtime.useGpu=true`
 
 Priority notes:

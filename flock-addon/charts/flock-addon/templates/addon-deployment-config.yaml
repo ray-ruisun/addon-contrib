@@ -33,14 +33,6 @@ spec:
       value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
     - name: NUM_PARTICIPANTS
       value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
-    - name: PRIVATE_KEY_SECRET_NAME
-      value: {{ .Values.deploymentConfig.privateKeySecret.name | quote }}
-    - name: PRIVATE_KEY_SECRET_KEY
-      value: {{ .Values.deploymentConfig.privateKeySecret.key | quote }}
-    - name: HF_TOKEN_SECRET_NAME
-      value: {{ .Values.deploymentConfig.hfTokenSecret.name | quote }}
-    - name: HF_TOKEN_SECRET_KEY
-      value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
 {{- if .Values.placement.gpu.enabled }}
 ---
 apiVersion: addon.open-cluster-management.io/v1alpha1
@@ -77,14 +69,6 @@ spec:
       value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
     - name: NUM_PARTICIPANTS
       value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
-    - name: PRIVATE_KEY_SECRET_NAME
-      value: {{ .Values.deploymentConfig.privateKeySecret.name | quote }}
-    - name: PRIVATE_KEY_SECRET_KEY
-      value: {{ .Values.deploymentConfig.privateKeySecret.key | quote }}
-    - name: HF_TOKEN_SECRET_NAME
-      value: {{ .Values.deploymentConfig.hfTokenSecret.name | quote }}
-    - name: HF_TOKEN_SECRET_KEY
-      value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
 {{- end }}
 {{- if .Values.placement.all.enabled }}
 ---
@@ -122,13 +106,5 @@ spec:
       value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
     - name: NUM_PARTICIPANTS
       value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
-    - name: PRIVATE_KEY_SECRET_NAME
-      value: {{ .Values.deploymentConfig.privateKeySecret.name | quote }}
-    - name: PRIVATE_KEY_SECRET_KEY
-      value: {{ .Values.deploymentConfig.privateKeySecret.key | quote }}
-    - name: HF_TOKEN_SECRET_NAME
-      value: {{ .Values.deploymentConfig.hfTokenSecret.name | quote }}
-    - name: HF_TOKEN_SECRET_KEY
-      value: {{ .Values.deploymentConfig.hfTokenSecret.key | quote }}
 {{- end }}
 {{- end }}
