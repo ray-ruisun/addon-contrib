@@ -44,6 +44,10 @@ IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
 TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924' make deploy-auto-all
 ```
 
+`deploy-auto-all` is CPU-safe by default. Override `AUTO_ALL_USE_GPU=true`
+and `AUTO_ALL_GPU_RESOURCE_ENABLED=true` only if every selected cluster can
+schedule GPU workloads.
+
 Check:
 
 ```bash

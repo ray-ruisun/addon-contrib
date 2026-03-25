@@ -382,7 +382,7 @@ kubectl -n cluster1 get manifestwork
 Should see:
 
 - `managedclusteraddon/flock-addon` exists
-- `spec.configs` includes `flock-addon` and `flock-addon-config`
+- without `CONFIG=...`, OCM uses the default config from `clustermanagementaddon/flock-addon`
 - a `ManifestWork` for `flock-addon` appears
 
 ### 5) Verify the runtime on the managed cluster
@@ -756,6 +756,10 @@ Should see:
 ## Per-Cluster Override
 
 If one cluster needs different defaults, create a dedicated `AddOnDeploymentConfig` and reference it from that cluster's `ManagedClusterAddOn`.
+This works for runtime variables such as `TASK_ADDRESS`, `BLOCKCHAIN_RPC`, and
+`FLOCK_ALLIANCE_ENV_FILE`. GPU resource requests are still chart-level settings,
+so changing only `USE_GPU` in `AddOnDeploymentConfig` does not remove a baked-in
+`nvidia.com/gpu` request from the Deployment.
 
 Example `AddOnDeploymentConfig`:
 
@@ -794,9 +798,6 @@ metadata:
     addon.open-cluster-management.io/v1alpha1-install-namespace: flock-system
 spec:
   configs:
-    - group: addon.open-cluster-management.io
-      resource: addontemplates
-      name: flock-addon
     - group: addon.open-cluster-management.io
       resource: addondeploymentconfigs
       name: flock-addon-config-cluster1
@@ -839,6 +840,9 @@ Should see:
 IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
 TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924' make deploy-auto-all
 ```
+
+`deploy-auto-all` is CPU-safe by default. It sets `AUTO_ALL_USE_GPU=false` and
+`AUTO_ALL_GPU_RESOURCE_ENABLED=false` unless you override them explicitly.
 
 Check:
 

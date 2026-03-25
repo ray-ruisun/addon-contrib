@@ -269,7 +269,7 @@ kubectl -n cluster1 get manifestwork
 Should see:
 
 - `managedclusteraddon/flock-addon` exists
-- `spec.configs` includes `flock-addon` and `flock-addon-config`
+- without `CONFIG=...`, OCM uses the default config from `clustermanagementaddon/flock-addon`
 - a `ManifestWork` appears
 
 ## Step 5: Verify Runtime on the Managed Cluster

@@ -118,7 +118,7 @@ kubectl -n cluster1 get manifestwork
 
 Should see:
 
-- `spec.configs` contains both `flock-addon` and `flock-addon-config`
+- `managedclusteraddon/flock-addon` still exists
 - `ManifestWork` appears after re-enable
 
 ## 4) Namespace Exists but Pod Does Not Start

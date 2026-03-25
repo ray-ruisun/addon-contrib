@@ -11,6 +11,8 @@ IMAGE_TAG ?= latest
 IMAGE_PULL_POLICY ?= Always
 USE_GPU ?= true
 GPU_RESOURCE_ENABLED ?= $(USE_GPU)
+AUTO_ALL_USE_GPU ?= false
+AUTO_ALL_GPU_RESOURCE_ENABLED ?= $(AUTO_ALL_USE_GPU)
 FLOCK_ALLIANCE_IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_OWNER)/$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_PULL_SECRET ?=
 
@@ -109,9 +111,9 @@ deploy-auto-all: ## Deploy with auto-install for all clusters in global set ([TA
 		--set addon.installStrategy=Placements \
 		--set placement.gpu.enabled=false \
 		--set placement.all.enabled=true \
-		--set deploymentConfig.runtime.useGpu='$(USE_GPU)' \
-		--set placement.all.config.useGpu='$(USE_GPU)' \
-		--set agent.gpuResource.enabled=$(GPU_RESOURCE_ENABLED) \
+		--set deploymentConfig.runtime.useGpu='$(AUTO_ALL_USE_GPU)' \
+		--set placement.all.config.useGpu='$(AUTO_ALL_USE_GPU)' \
+		--set agent.gpuResource.enabled=$(AUTO_ALL_GPU_RESOURCE_ENABLED) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
@@ -125,6 +127,7 @@ enable-addon: ## Enable addon on a cluster (usage: make enable-addon CLUSTER=clu
 ifndef CLUSTER
 	$(error CLUSTER is not set. Usage: make enable-addon CLUSTER=cluster1 [CONFIG=flock-addon-config])
 endif
+ifdef CONFIG
 	@echo "apiVersion: addon.open-cluster-management.io/v1alpha1" | \
 	{ cat; echo "kind: ManagedClusterAddOn"; } | \
 	{ cat; echo "metadata:"; } | \
@@ -135,13 +138,20 @@ endif
 	{ cat; echo "spec:"; } | \
 	{ cat; echo "  configs:"; } | \
 	{ cat; echo "    - group: addon.open-cluster-management.io"; } | \
-	{ cat; echo "      resource: addontemplates"; } | \
-	{ cat; echo "      name: flock-addon"; } | \
-	{ cat; echo "    - group: addon.open-cluster-management.io"; } | \
 	{ cat; echo "      resource: addondeploymentconfigs"; } | \
-	{ cat; echo "      name: $${CONFIG:-flock-addon-config}"; } | \
+	{ cat; echo "      name: $(CONFIG)"; } | \
 	{ cat; echo "      namespace: $(NAMESPACE)"; } | \
 	$(KUBECTL) apply -f -
+else
+	@echo "apiVersion: addon.open-cluster-management.io/v1alpha1" | \
+	{ cat; echo "kind: ManagedClusterAddOn"; } | \
+	{ cat; echo "metadata:"; } | \
+	{ cat; echo "  name: flock-addon"; } | \
+	{ cat; echo "  namespace: $(CLUSTER)"; } | \
+	{ cat; echo "  annotations:"; } | \
+	{ cat; echo "    addon.open-cluster-management.io/v1alpha1-install-namespace: flock-system"; } | \
+	$(KUBECTL) apply -f -
+endif
 
 .PHONY: disable-addon
 disable-addon: ## Disable addon on a cluster (usage: make disable-addon CLUSTER=cluster1)
