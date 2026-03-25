@@ -9,10 +9,6 @@ IMAGE_OWNER ?= flock-io
 IMAGE_NAME ?= fl-alliance-client
 IMAGE_TAG ?= latest
 IMAGE_PULL_POLICY ?= Always
-USE_GPU ?= true
-GPU_RESOURCE_ENABLED ?= $(USE_GPU)
-AUTO_ALL_USE_GPU ?= false
-AUTO_ALL_GPU_RESOURCE_ENABLED ?= $(AUTO_ALL_USE_GPU)
 FLOCK_ALLIANCE_IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_OWNER)/$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_PULL_SECRET ?=
 
@@ -35,8 +31,6 @@ deploy: ## Deploy FLock addon via Helm
 		--set addon.installStrategy=Manual \
 		--set placement.gpu.enabled=false \
 		--set placement.all.enabled=false \
-		--set deploymentConfig.runtime.useGpu='$(USE_GPU)' \
-		--set agent.gpuResource.enabled=$(GPU_RESOURCE_ENABLED) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
@@ -45,8 +39,6 @@ deploy: ## Deploy FLock addon via Helm
 .PHONY: upgrade
 upgrade: ## Upgrade FLock addon with current image/runtime values
 	$(HELM) upgrade $(RELEASE_NAME) $(CHART_PATH) \
-		--set deploymentConfig.runtime.useGpu='$(USE_GPU)' \
-		--set agent.gpuResource.enabled=$(GPU_RESOURCE_ENABLED) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
@@ -64,8 +56,6 @@ endif
 		--set addon.installStrategy=Manual \
 		--set placement.gpu.enabled=false \
 		--set placement.all.enabled=false \
-		--set deploymentConfig.runtime.useGpu='$(USE_GPU)' \
-		--set agent.gpuResource.enabled=$(GPU_RESOURCE_ENABLED) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
@@ -94,9 +84,6 @@ deploy-auto-gpu: ## Deploy with auto-install for gpu=true clusters ([TASK_ADDRES
 		--set addon.installStrategy=Placements \
 		--set placement.gpu.enabled=true \
 		--set placement.all.enabled=false \
-		--set deploymentConfig.runtime.useGpu='$(USE_GPU)' \
-		--set placement.gpu.config.useGpu='$(USE_GPU)' \
-		--set agent.gpuResource.enabled=$(GPU_RESOURCE_ENABLED) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
@@ -106,14 +93,11 @@ deploy-auto-gpu: ## Deploy with auto-install for gpu=true clusters ([TASK_ADDRES
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
 .PHONY: deploy-auto-all
-deploy-auto-all: ## Deploy with auto-install for all clusters in global set ([TASK_ADDRESS=0x...] [RPC=https://...] [TOKEN_ADDRESS=0x...])
+deploy-auto-all: ## Deploy with dynamic auto-install: gpu=true clusters use GPU template, others use CPU template
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set addon.installStrategy=Placements \
-		--set placement.gpu.enabled=false \
+		--set placement.gpu.enabled=true \
 		--set placement.all.enabled=true \
-		--set deploymentConfig.runtime.useGpu='$(AUTO_ALL_USE_GPU)' \
-		--set placement.all.config.useGpu='$(AUTO_ALL_USE_GPU)' \
-		--set agent.gpuResource.enabled=$(AUTO_ALL_GPU_RESOURCE_ENABLED) \
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
@@ -123,12 +107,26 @@ deploy-auto-all: ## Deploy with auto-install for all clusters in global set ([TA
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
 .PHONY: enable-addon
-enable-addon: ## Enable addon on a cluster (usage: make enable-addon CLUSTER=cluster1 [CONFIG=flock-addon-config])
+enable-addon: ## Enable addon on a cluster; auto-select gpu/cpu template from managedcluster label gpu=true (override with CONFIG=/TEMPLATE=)
 ifndef CLUSTER
-	$(error CLUSTER is not set. Usage: make enable-addon CLUSTER=cluster1 [CONFIG=flock-addon-config])
+	$(error CLUSTER is not set. Usage: make enable-addon CLUSTER=cluster1 [CONFIG=flock-addon-config] [TEMPLATE=flock-addon])
 endif
-ifdef CONFIG
-	@echo "apiVersion: addon.open-cluster-management.io/v1alpha1" | \
+	@GPU_LABEL=$$($(KUBECTL) get managedcluster $(CLUSTER) -o jsonpath='{.metadata.labels.gpu}' 2>/dev/null || true); \
+	if [ -n "$(TEMPLATE)" ]; then \
+		TEMPLATE_NAME='$(TEMPLATE)'; \
+	elif [ "$$GPU_LABEL" = "true" ]; then \
+		TEMPLATE_NAME='$(RELEASE_NAME)-gpu'; \
+	else \
+		TEMPLATE_NAME='$(RELEASE_NAME)'; \
+	fi; \
+	if [ -n "$(CONFIG)" ]; then \
+		CONFIG_NAME='$(CONFIG)'; \
+	elif [ "$$GPU_LABEL" = "true" ]; then \
+		CONFIG_NAME='$(RELEASE_NAME)-gpu-config'; \
+	else \
+		CONFIG_NAME='$(RELEASE_NAME)-config'; \
+	fi; \
+	echo "apiVersion: addon.open-cluster-management.io/v1alpha1" | \
 	{ cat; echo "kind: ManagedClusterAddOn"; } | \
 	{ cat; echo "metadata:"; } | \
 	{ cat; echo "  name: flock-addon"; } | \
@@ -138,20 +136,13 @@ ifdef CONFIG
 	{ cat; echo "spec:"; } | \
 	{ cat; echo "  configs:"; } | \
 	{ cat; echo "    - group: addon.open-cluster-management.io"; } | \
+	{ cat; echo "      resource: addontemplates"; } | \
+	{ cat; echo "      name: $$TEMPLATE_NAME"; } | \
+	{ cat; echo "    - group: addon.open-cluster-management.io"; } | \
 	{ cat; echo "      resource: addondeploymentconfigs"; } | \
-	{ cat; echo "      name: $(CONFIG)"; } | \
+	{ cat; echo "      name: $$CONFIG_NAME"; } | \
 	{ cat; echo "      namespace: $(NAMESPACE)"; } | \
 	$(KUBECTL) apply -f -
-else
-	@echo "apiVersion: addon.open-cluster-management.io/v1alpha1" | \
-	{ cat; echo "kind: ManagedClusterAddOn"; } | \
-	{ cat; echo "metadata:"; } | \
-	{ cat; echo "  name: flock-addon"; } | \
-	{ cat; echo "  namespace: $(CLUSTER)"; } | \
-	{ cat; echo "  annotations:"; } | \
-	{ cat; echo "    addon.open-cluster-management.io/v1alpha1-install-namespace: flock-system"; } | \
-	$(KUBECTL) apply -f -
-endif
 
 .PHONY: disable-addon
 disable-addon: ## Disable addon on a cluster (usage: make disable-addon CLUSTER=cluster1)

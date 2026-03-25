@@ -1,75 +1,83 @@
+{{- $templates := list
+    (dict "name" (include "flock-addon.templateName" .) "gpu" false)
+    (dict "name" (include "flock-addon.gpuTemplateName" .) "gpu" true)
+-}}
+{{- range $index, $template := $templates }}
+{{- if gt $index 0 }}
+---
+{{- end }}
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: AddOnTemplate
 metadata:
-  name: {{ .Values.addon.name }}
+  name: {{ $template.name }}
 spec:
-  addonName: {{ .Values.addon.name }}
+  addonName: {{ $.Values.addon.name }}
   agentSpec:
     workload:
       manifests:
         - apiVersion: v1
           kind: Namespace
           metadata:
-            name: {{ .Values.agent.namespace }}
+            name: {{ $.Values.agent.namespace }}
             labels:
-              app.kubernetes.io/name: {{ .Values.addon.name }}
+              app.kubernetes.io/name: {{ $.Values.addon.name }}
               app.kubernetes.io/managed-by: open-cluster-management
 
         - apiVersion: v1
           kind: ServiceAccount
           metadata:
-            name: {{ .Values.agent.serviceAccountName }}
-            namespace: {{ .Values.agent.namespace }}
+            name: {{ $.Values.agent.serviceAccountName }}
+            namespace: {{ $.Values.agent.namespace }}
 
         - apiVersion: apps/v1
           kind: Deployment
           metadata:
             name: flock-agent
-            namespace: {{ .Values.agent.namespace }}
+            namespace: {{ $.Values.agent.namespace }}
             labels:
-              app.kubernetes.io/name: {{ .Values.addon.name }}
+              app.kubernetes.io/name: {{ $.Values.addon.name }}
               app.kubernetes.io/component: agent
             annotations:
               cluster-name: "{{`{{CLUSTER_NAME}}`}}"
           spec:
-            replicas: {{ .Values.agent.replicas }}
+            replicas: {{ $.Values.agent.replicas }}
             selector:
               matchLabels:
-                app.kubernetes.io/name: {{ .Values.addon.name }}
+                app.kubernetes.io/name: {{ $.Values.addon.name }}
                 app.kubernetes.io/component: agent
             template:
               metadata:
                 labels:
-                  app.kubernetes.io/name: {{ .Values.addon.name }}
+                  app.kubernetes.io/name: {{ $.Values.addon.name }}
                   app.kubernetes.io/component: agent
                 annotations:
                   cluster-name: "{{`{{CLUSTER_NAME}}`}}"
               spec:
-                serviceAccountName: {{ .Values.agent.serviceAccountName }}
-                {{- with .Values.agent.nodeSelector }}
+                serviceAccountName: {{ $.Values.agent.serviceAccountName }}
+                {{- with $.Values.agent.nodeSelector }}
                 nodeSelector:
                   {{- toYaml . | nindent 18 }}
                 {{- end }}
-                {{- with .Values.agent.tolerations }}
+                {{- with $.Values.agent.tolerations }}
                 tolerations:
                   {{- toYaml . | nindent 18 }}
                 {{- end }}
-                {{- with .Values.agent.affinity }}
+                {{- with $.Values.agent.affinity }}
                 affinity:
                   {{- toYaml . | nindent 18 }}
                 {{- end }}
-                {{- if .Values.image.pullSecrets }}
+                {{- if $.Values.image.pullSecrets }}
                 imagePullSecrets:
-                  {{- range .Values.image.pullSecrets }}
+                  {{- range $.Values.image.pullSecrets }}
                   - name: {{ . | quote }}
                   {{- end }}
                 {{- end }}
                 volumes:
                   - name: shared-data
-                    {{- if .Values.agent.dataVolume.existingClaim }}
+                    {{- if $.Values.agent.dataVolume.existingClaim }}
                     persistentVolumeClaim:
-                      claimName: {{ .Values.agent.dataVolume.existingClaim }}
-                    {{- else if .Values.agent.dataVolume.hostPath }}
+                      claimName: {{ $.Values.agent.dataVolume.existingClaim }}
+                    {{- else if $.Values.agent.dataVolume.hostPath }}
                     hostPath:
                       path: "{{`{{HOST_DATA_PATH}}`}}"
                       type: DirectoryOrCreate
@@ -79,7 +87,7 @@ spec:
                 containers:
                   - name: flock-alliance-client
                     image: "{{`{{FLOCK_ALLIANCE_IMAGE}}`}}"
-                    imagePullPolicy: {{ .Values.image.pullPolicy }}
+                    imagePullPolicy: {{ $.Values.image.pullPolicy }}
                     command:
                       - "/bin/sh"
                       - "-ec"
@@ -153,16 +161,17 @@ spec:
                     volumeMounts:
                       - name: shared-data
                         mountPath: /data
-                    {{- $resources := deepCopy .Values.agent.resources.flockAlliance }}
-                    {{- if .Values.agent.gpuResource.enabled }}
+                    {{- $resources := deepCopy $.Values.agent.resources.flockAlliance }}
+                    {{- if $template.gpu }}
                     {{- if not (hasKey $resources "requests") }}
                     {{- $_ := set $resources "requests" (dict) }}
                     {{- end }}
                     {{- if not (hasKey $resources "limits") }}
                     {{- $_ := set $resources "limits" (dict) }}
                     {{- end }}
-                    {{- $_ := set $resources.requests "nvidia.com/gpu" .Values.agent.gpuResource.count }}
-                    {{- $_ := set $resources.limits "nvidia.com/gpu" .Values.agent.gpuResource.count }}
+                    {{- $_ := set $resources.requests "nvidia.com/gpu" $.Values.agent.gpuResource.count }}
+                    {{- $_ := set $resources.limits "nvidia.com/gpu" $.Values.agent.gpuResource.count }}
                     {{- end }}
                     resources:
                       {{- toYaml $resources | nindent 22 }}
+{{- end }}

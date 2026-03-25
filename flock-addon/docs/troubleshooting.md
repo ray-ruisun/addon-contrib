@@ -191,7 +191,9 @@ If you want CPU mode intentionally, redeploy with:
 
 ```bash
 # [Hub]
-USE_GPU='false' GPU_RESOURCE_ENABLED='false' make deploy-testnet TASK_ADDRESS='0x...'
+kubectl label managedcluster <cluster-name> gpu-
+make disable-addon CLUSTER=<cluster-name>
+make enable-addon CLUSTER=<cluster-name>
 ```
 
 If GPU nodes are tainted or use dedicated labels, deploy with matching scheduling hints:

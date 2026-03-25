@@ -39,4 +39,14 @@ metadata:
 spec:
   clusterSets:
     - {{ .Values.placement.all.clusterSet }}
+  {{- if .Values.placement.gpu.enabled }}
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchExpressions:
+            - key: gpu
+              operator: NotIn
+              values:
+                - "true"
+  {{- end }}
 {{- end }}

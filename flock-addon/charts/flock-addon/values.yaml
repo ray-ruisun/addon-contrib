@@ -14,7 +14,6 @@ agent:
   tolerations: []
   affinity: {}
   gpuResource:
-    enabled: true
     count: 1
   dataVolume:
     # Use one of:
@@ -43,8 +42,8 @@ addon:
   installStrategy: Manual
 
 deploymentConfig:
-  enabled: true
   name: flock-addon-config
+  gpuName: flock-addon-gpu-config
 
   blockchain:
     # Shared testnet setting: set rpc/tokenAddress/taskAddress centrally via Helm.
@@ -59,7 +58,8 @@ deploymentConfig:
     numParticipants: "1"
 
   runtime:
-    useGpu: "true"
+    useGpu: "false"
+    gpuUseGpu: "true"
     # Optional env file path mounted inside the Pod for FLockAlliance.
     # Typical value when using the shared data volume: /data/.env
     flockAllianceEnvFile: "/data/.env"
@@ -73,14 +73,8 @@ placement:
     enabled: false
     name: flock-addon-gpu-placement
     clusterSet: default
-    config:
-      name: flock-addon-gpu-config
-      useGpu: "true"
 
   all:
     enabled: false
     name: flock-addon-all-placement
     clusterSet: global
-    config:
-      name: flock-addon-all-config
-      useGpu: "true"

@@ -1,4 +1,3 @@
-{{- if .Values.deploymentConfig.enabled }}
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: AddOnDeploymentConfig
 metadata:
@@ -33,12 +32,11 @@ spec:
       value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
     - name: NUM_PARTICIPANTS
       value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
-{{- if .Values.placement.gpu.enabled }}
 ---
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: AddOnDeploymentConfig
 metadata:
-  name: {{ .Values.placement.gpu.config.name }}
+  name: {{ .Values.deploymentConfig.gpuName }}
   namespace: {{ .Values.addon.namespace }}
 spec:
   agentInstallNamespace: {{ .Values.agent.namespace }}
@@ -62,49 +60,10 @@ spec:
     - name: LOCAL_STORAGE_DIR
       value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
     - name: USE_GPU
-      value: {{ .Values.placement.gpu.config.useGpu | quote }}
+      value: {{ .Values.deploymentConfig.runtime.gpuUseGpu | quote }}
     - name: FLOCK_ALLIANCE_ENV_FILE
       value: {{ .Values.deploymentConfig.runtime.flockAllianceEnvFile | quote }}
     - name: NO_INCENTIVE
       value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
     - name: NUM_PARTICIPANTS
       value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
-{{- end }}
-{{- if .Values.placement.all.enabled }}
----
-apiVersion: addon.open-cluster-management.io/v1alpha1
-kind: AddOnDeploymentConfig
-metadata:
-  name: {{ .Values.placement.all.config.name }}
-  namespace: {{ .Values.addon.namespace }}
-spec:
-  agentInstallNamespace: {{ .Values.agent.namespace }}
-  customizedVariables:
-    - name: FLOCK_ALLIANCE_IMAGE
-      value: {{ include "flock-addon.flockAllianceImage" . | quote }}
-    - name: DATA_PATH
-      value: {{ .Values.agent.dataPath | quote }}
-    - name: HOST_DATA_PATH
-      value: {{ .Values.agent.dataVolume.hostPath | quote }}
-    - name: BLOCKCHAIN_RPC
-      value: {{ .Values.deploymentConfig.blockchain.rpc | quote }}
-    - name: TOKEN_ADDRESS
-      value: {{ .Values.deploymentConfig.blockchain.tokenAddress | quote }}
-    - name: TASK_ADDRESS
-      value: {{ .Values.deploymentConfig.blockchain.taskAddress | quote }}
-    - name: STAKE
-      value: {{ .Values.deploymentConfig.blockchain.stake | quote }}
-    - name: STORAGE_BACKEND
-      value: {{ .Values.deploymentConfig.storage.backend | quote }}
-    - name: LOCAL_STORAGE_DIR
-      value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
-    - name: USE_GPU
-      value: {{ .Values.placement.all.config.useGpu | quote }}
-    - name: FLOCK_ALLIANCE_ENV_FILE
-      value: {{ .Values.deploymentConfig.runtime.flockAllianceEnvFile | quote }}
-    - name: NO_INCENTIVE
-      value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
-    - name: NUM_PARTICIPANTS
-      value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
-{{- end }}
-{{- end }}

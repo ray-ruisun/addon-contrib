@@ -98,8 +98,6 @@ export IMAGE_OWNER='ray-ruisun'
 export IMAGE_NAME='fl-alliance-client'
 export IMAGE_TAG='<git-sha-or-release-tag>'
 export IMAGE_PULL_POLICY='Always'
-export USE_GPU='true'
-export GPU_RESOURCE_ENABLED='true'
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
@@ -262,8 +260,9 @@ Behavior:
 - `TASK_ADDRESS` must be passed from the Hub at deploy time
 - `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` are read from each cluster node `.env`
 - `PRIVATE_KEY` and `HF_TOKEN` are read from each cluster node `.env`
-- GPU runtime is enabled by default through `deploymentConfig.runtime.useGpu=true`
-- deploy targets also request GPU resources by default (`nvidia.com/gpu=1`)
+- GPU/CPU template selection follows the Hub-side `managedcluster` label `gpu=true`
+- `gpu=true` managed clusters use the GPU template and request `nvidia.com/gpu`
+- other managed clusters use the CPU template and run without a GPU request
 
 ### 1) Prepare the node path
 
@@ -331,8 +330,6 @@ Run on the Hub.
 ```bash
 # [Hub]
 cd flock-addon
-export USE_GPU='true'
-export GPU_RESOURCE_ENABLED='true'
 make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
@@ -342,7 +339,7 @@ If you want a different image owner:
 # [Hub]
 cd flock-addon
 export IMAGE_SHA=$(git rev-parse --short=12 HEAD)
-USE_GPU='true' GPU_RESOURCE_ENABLED='true' IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
 Check:
@@ -357,8 +354,8 @@ kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config 
 Should see:
 
 - `clustermanagementaddon/flock-addon` exists
-- `addontemplate/flock-addon` exists
-- `addondeploymentconfig/flock-addon-config` exists
+- `addontemplate/flock-addon` and `addontemplate/flock-addon-gpu` exist
+- `addondeploymentconfig/flock-addon-config` and `addondeploymentconfig/flock-addon-gpu-config` exist
 - `TASK_ADDRESS` matches the value you passed
 - `FLOCK_ALLIANCE_IMAGE` matches the image you expect
 
@@ -382,7 +379,8 @@ kubectl -n cluster1 get manifestwork
 Should see:
 
 - `managedclusteraddon/flock-addon` exists
-- without `CONFIG=...`, OCM uses the default config from `clustermanagementaddon/flock-addon`
+- `spec.configs` selects `flock-addon-gpu` and `flock-addon-gpu-config` when the cluster label `gpu=true`
+- otherwise `spec.configs` selects `flock-addon` and `flock-addon-config`
 - a `ManifestWork` for `flock-addon` appears
 
 ### 5) Verify the runtime on the managed cluster
@@ -402,16 +400,10 @@ Should see:
 - `deployment/flock-agent` exists
 - Pod becomes `Running`
 - logs show `FLockAlliance` startup rather than image pull or crash errors
-- Pod resources show `request=1` and `limit=1` for `nvidia.com/gpu`
-- at least one node shows non-empty `GPU_ALLOCATABLE`
+- on `gpu=true` clusters, Pod resources show `request=1` and `limit=1` for `nvidia.com/gpu`
+- on CPU clusters, the GPU request fields are empty and the Pod still runs
+- a GPU-enabled node should show non-empty `GPU_ALLOCATABLE`
 - pod startup logs include either `NVIDIA device files detected` or `No NVIDIA device files detected in container`
-
-If you intentionally want CPU mode:
-
-```bash
-# [Hub]
-USE_GPU='false' GPU_RESOURCE_ENABLED='false' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
-```
 
 ## Local Chain Mode
 
@@ -610,7 +602,7 @@ kubectl -n cluster1 get manifestwork
 
 Should see:
 
-- `spec.configs` contains both `flock-addon` and `flock-addon-config`
+- `spec.configs` contains one template/config pair that matches the cluster label
 - `ManifestWork` appears after re-enable
 
 ### Managed-cluster checks
@@ -756,10 +748,10 @@ Should see:
 ## Per-Cluster Override
 
 If one cluster needs different defaults, create a dedicated `AddOnDeploymentConfig` and reference it from that cluster's `ManagedClusterAddOn`.
-This works for runtime variables such as `TASK_ADDRESS`, `BLOCKCHAIN_RPC`, and
-`FLOCK_ALLIANCE_ENV_FILE`. GPU resource requests are still chart-level settings,
-so changing only `USE_GPU` in `AddOnDeploymentConfig` does not remove a baked-in
-`nvidia.com/gpu` request from the Deployment.
+Runtime variables such as `TASK_ADDRESS`, `BLOCKCHAIN_RPC`, and
+`FLOCK_ALLIANCE_ENV_FILE` come from `AddOnDeploymentConfig`. GPU scheduling comes
+from the selected `AddOnTemplate`, so a GPU cluster should normally reference
+`flock-addon-gpu` while a CPU cluster should reference `flock-addon`.
 
 Example `AddOnDeploymentConfig`:
 
@@ -798,6 +790,9 @@ metadata:
     addon.open-cluster-management.io/v1alpha1-install-namespace: flock-system
 spec:
   configs:
+    - group: addon.open-cluster-management.io
+      resource: addontemplates
+      name: flock-addon
     - group: addon.open-cluster-management.io
       resource: addondeploymentconfigs
       name: flock-addon-config-cluster1
@@ -841,8 +836,9 @@ IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
 TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924' make deploy-auto-all
 ```
 
-`deploy-auto-all` is CPU-safe by default. It sets `AUTO_ALL_USE_GPU=false` and
-`AUTO_ALL_GPU_RESOURCE_ENABLED=false` unless you override them explicitly.
+`deploy-auto-all` is dynamic by default. It creates one placement for
+`gpu=true` clusters and one fallback placement for the rest, so GPU-capable
+clusters get the GPU template while non-GPU clusters stay on CPU.
 
 Check:
 
@@ -874,7 +870,7 @@ Addon mapping:
 - `--task-address` maps to `deploymentConfig.blockchain.taskAddress`
 - `--dataset` maps to `DATA_PATH`
 - `--hf-token` comes from node `.env`
-- `--gpu` maps to `deploymentConfig.runtime.useGpu=true`
+- `--gpu` maps to selecting the GPU addon template/config for `gpu=true` clusters
 
 Effective priority:
 

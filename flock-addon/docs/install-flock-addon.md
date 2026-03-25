@@ -186,8 +186,6 @@ export IMAGE_OWNER='ray-ruisun'
 export IMAGE_NAME='fl-alliance-client'
 export IMAGE_SHA=$(git rev-parse --short=12 HEAD)
 export IMAGE_TAG="$IMAGE_SHA"
-export USE_GPU='true'
-export GPU_RESOURCE_ENABLED='true'
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
@@ -231,7 +229,7 @@ If you need a different image owner:
 ```bash
 # [Hub]
 cd flock-addon
-USE_GPU='true' GPU_RESOURCE_ENABLED='true' IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG="$IMAGE_SHA" make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
 Check:
@@ -247,11 +245,15 @@ Should see:
 
 - `clustermanagementaddon/flock-addon` exists
 - `addontemplate/flock-addon` exists
+- `addontemplate/flock-addon-gpu` exists
 - `addondeploymentconfig/flock-addon-config` exists
+- `addondeploymentconfig/flock-addon-gpu-config` exists
 - `TASK_ADDRESS` matches the value you passed
 - `FLOCK_ALLIANCE_IMAGE` matches the image you expect
 
 ## Step 4: Enable the Addon on a Managed Cluster
+
+GPU/CPU template selection follows the Hub-side `managedcluster` label `gpu=true`.
 
 ```bash
 # [Hub]
@@ -269,7 +271,8 @@ kubectl -n cluster1 get manifestwork
 Should see:
 
 - `managedclusteraddon/flock-addon` exists
-- without `CONFIG=...`, OCM uses the default config from `clustermanagementaddon/flock-addon`
+- `spec.configs` selects the GPU template/config on `gpu=true` clusters
+- `spec.configs` selects the CPU template/config on other clusters
 - a `ManifestWork` appears
 
 ## Step 5: Verify Runtime on the Managed Cluster
@@ -288,8 +291,9 @@ Should see:
 - Pod becomes `Running`
 - logs show `FLockAlliance` startup
 - the Pod pulls the image matching `FLOCK_ALLIANCE_IMAGE`
-- Pod resources show `request=1` and `limit=1` for `nvidia.com/gpu`
-- at least one node shows non-empty `GPU_ALLOCATABLE`
+- on `gpu=true` clusters, Pod resources show `request=1` and `limit=1` for `nvidia.com/gpu`
+- on CPU clusters, the GPU request fields are empty and the Pod still runs
+- at least one GPU-enabled node shows non-empty `GPU_ALLOCATABLE`
 
 ## Local Chain Mode
 
