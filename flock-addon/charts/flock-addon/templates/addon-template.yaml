@@ -106,11 +106,36 @@ spec:
                           echo "[flock-addon] nvidia-smi not available in image"
                         fi
 
+                        # Preserve non-empty values injected from OCM so the mounted
+                        # .env file can fill blanks, but does not override explicit
+                        # deploy-time settings such as TASK_ADDRESS or GPU mode.
+                        OCM_DATA_PATH="${DATA_PATH:-}"
+                        OCM_BLOCKCHAIN_RPC="${BLOCKCHAIN_RPC:-}"
+                        OCM_TOKEN_ADDRESS="${TOKEN_ADDRESS:-}"
+                        OCM_TASK_ADDRESS="${TASK_ADDRESS:-}"
+                        OCM_STAKE="${STAKE:-}"
+                        OCM_STORAGE_BACKEND="${STORAGE_BACKEND:-}"
+                        OCM_LOCAL_STORAGE_DIR="${LOCAL_STORAGE_DIR:-}"
+                        OCM_USE_GPU="${USE_GPU:-}"
+                        OCM_NO_INCENTIVE="${NO_INCENTIVE:-}"
+                        OCM_NUM_PARTICIPANTS="${NUM_PARTICIPANTS:-}"
+
                         if [ -n "${FLOCK_ALLIANCE_ENV_FILE:-}" ] && [ -f "${FLOCK_ALLIANCE_ENV_FILE}" ]; then
                           set -a
                           . "${FLOCK_ALLIANCE_ENV_FILE}"
                           set +a
                         fi
+
+                        if [ -n "${OCM_DATA_PATH:-}" ]; then export DATA_PATH="${OCM_DATA_PATH}"; fi
+                        if [ -n "${OCM_BLOCKCHAIN_RPC:-}" ]; then export BLOCKCHAIN_RPC="${OCM_BLOCKCHAIN_RPC}"; fi
+                        if [ -n "${OCM_TOKEN_ADDRESS:-}" ]; then export TOKEN_ADDRESS="${OCM_TOKEN_ADDRESS}"; fi
+                        if [ -n "${OCM_TASK_ADDRESS:-}" ]; then export TASK_ADDRESS="${OCM_TASK_ADDRESS}"; fi
+                        if [ -n "${OCM_STAKE:-}" ]; then export STAKE="${OCM_STAKE}"; fi
+                        if [ -n "${OCM_STORAGE_BACKEND:-}" ]; then export STORAGE_BACKEND="${OCM_STORAGE_BACKEND}"; fi
+                        if [ -n "${OCM_LOCAL_STORAGE_DIR:-}" ]; then export LOCAL_STORAGE_DIR="${OCM_LOCAL_STORAGE_DIR}"; fi
+                        if [ -n "${OCM_USE_GPU:-}" ]; then export USE_GPU="${OCM_USE_GPU}"; fi
+                        if [ -n "${OCM_NO_INCENTIVE:-}" ]; then export NO_INCENTIVE="${OCM_NO_INCENTIVE}"; fi
+                        if [ -n "${OCM_NUM_PARTICIPANTS:-}" ]; then export NUM_PARTICIPANTS="${OCM_NUM_PARTICIPANTS}"; fi
 
                         set -- python -u main.py \
                           --config config/conf.yaml \

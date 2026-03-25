@@ -748,10 +748,22 @@ Should see:
 ## Per-Cluster Override
 
 If one cluster needs different defaults, create a dedicated `AddOnDeploymentConfig` and reference it from that cluster's `ManagedClusterAddOn`.
-Runtime variables such as `TASK_ADDRESS`, `BLOCKCHAIN_RPC`, and
-`FLOCK_ALLIANCE_ENV_FILE` come from `AddOnDeploymentConfig`. GPU scheduling comes
-from the selected `AddOnTemplate`, so a GPU cluster should normally reference
+Runtime variables such as `TASK_ADDRESS`, `BLOCKCHAIN_RPC`,
+`FLOCK_ALLIANCE_ENV_FILE`, `HOST_DATA_PATH`, and `USE_GPU` still come from
+`AddOnDeploymentConfig` through `customizedVariables`.
+What changed is only the source Helm values behind them: old paths such as
+`placement.all.config.useGpu` are gone. GPU scheduling now comes from the
+selected `AddOnTemplate`, so a GPU cluster should normally reference
 `flock-addon-gpu` while a CPU cluster should reference `flock-addon`.
+
+Parameter flow is:
+
+1. Helm values render shared `AddOnDeploymentConfig` objects.
+2. `ManagedClusterAddOn` selects one `AddOnTemplate` and one `AddOnDeploymentConfig`.
+3. OCM injects `customizedVariables` into the template placeholders.
+4. The Pod gets env vars such as `TASK_ADDRESS`, `USE_GPU`, and `HOST_DATA_PATH`.
+5. The container entrypoint loads `.env` from `FLOCK_ALLIANCE_ENV_FILE`; non-empty OCM-injected values stay authoritative, while blank values can be filled from `.env`.
+6. The entrypoint appends CLI `--override` values before starting `FLockAlliance`.
 
 Example `AddOnDeploymentConfig`:
 

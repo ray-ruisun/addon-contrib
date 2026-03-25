@@ -80,7 +80,16 @@ Should see:
 
 ## Per-Cluster Override with Placement
 
-If a cluster needs different runtime defaults, create a dedicated `AddOnDeploymentConfig` and bind it explicitly through manual mode, or use a placement-specific config.
+If a cluster needs different runtime defaults, create a dedicated `AddOnDeploymentConfig` and bind it explicitly through manual mode.
+Placement mode uses the built-in CPU/GPU config pair automatically:
+
+- `flock-addon-config` for the CPU template
+- `flock-addon-gpu-config` for the GPU template
+
+`customizedVariables` are still the runtime injection mechanism. What was removed
+were the old chart value paths that used to feed some of those variables.
+If a value is non-empty in the selected `AddOnDeploymentConfig`, it overrides the
+same key in the mounted `.env`; blank config values can be filled by `.env`.
 
 Example:
 

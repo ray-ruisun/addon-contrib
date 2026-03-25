@@ -251,6 +251,13 @@ Should see:
 - `TASK_ADDRESS` matches the value you passed
 - `FLOCK_ALLIANCE_IMAGE` matches the image you expect
 
+Notes:
+
+- `AddOnDeploymentConfig.customizedVariables` is still how runtime values are passed into the addon Pod.
+- Old Helm value paths such as `placement.all.config.useGpu` were removed during cleanup.
+- GPU resource scheduling is now controlled by the selected `AddOnTemplate`, while runtime flags such as `USE_GPU` still come from `AddOnDeploymentConfig`.
+- Non-empty values injected from OCM stay authoritative; the mounted `.env` is used to fill values left blank by the deploy config.
+
 ## Step 4: Enable the Addon on a Managed Cluster
 
 GPU/CPU template selection follows the Hub-side `managedcluster` label `gpu=true`.
