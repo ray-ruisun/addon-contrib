@@ -88,8 +88,9 @@ Placement mode uses the built-in CPU/GPU config pair automatically:
 
 `customizedVariables` are still the runtime injection mechanism. What was removed
 were the old chart value paths that used to feed some of those variables.
-If a value is non-empty in the selected `AddOnDeploymentConfig`, it overrides the
-same key in the mounted `.env`; blank config values can be filled by `.env`.
+`TASK_ADDRESS`, `USE_GPU`, `STORAGE_BACKEND`, and `NO_INCENTIVE` stay authoritative
+from OCM. `NUM_PARTICIPANTS` is forced from OCM only when `STORAGE_BACKEND=local`;
+other runtime keys can come from the mounted `.env` on each cluster node.
 
 Example:
 

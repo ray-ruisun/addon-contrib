@@ -258,6 +258,7 @@ This is the default deployment mode.
 Behavior:
 
 - `TASK_ADDRESS` must be passed from the Hub at deploy time
+- `STORAGE_BACKEND` and `NO_INCENTIVE` are controlled from the Hub deploy config
 - `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` are read from each cluster node `.env`
 - `PRIVATE_KEY` and `HF_TOKEN` are read from each cluster node `.env`
 - GPU/CPU template selection follows the Hub-side `managedcluster` label `gpu=true`
@@ -306,7 +307,6 @@ PRIVATE_KEY=0x...
 HF_TOKEN=hf_...
 BLOCKCHAIN_RPC=https://sepolia.base.org
 TOKEN_ADDRESS=0x...
-STORAGE_BACKEND=s3
 LOCAL_STORAGE_DIR=/data/shared
 ```
 
@@ -422,7 +422,6 @@ HF_TOKEN=hf_...
 BLOCKCHAIN_RPC=http://<node-ip-or-service>:8545
 TOKEN_ADDRESS=0x...
 TASK_ADDRESS=0x...
-STORAGE_BACKEND=local
 LOCAL_STORAGE_DIR=/data/shared
 ```
 
@@ -762,8 +761,9 @@ Parameter flow is:
 2. `ManagedClusterAddOn` selects one `AddOnTemplate` and one `AddOnDeploymentConfig`.
 3. OCM injects `customizedVariables` into the template placeholders.
 4. The Pod gets env vars such as `TASK_ADDRESS`, `USE_GPU`, and `HOST_DATA_PATH`.
-5. The container entrypoint loads `.env` from `FLOCK_ALLIANCE_ENV_FILE`; non-empty OCM-injected values stay authoritative, while blank values can be filled from `.env`.
-6. The entrypoint appends CLI `--override` values before starting `FLockAlliance`.
+5. The container entrypoint loads `.env` from `FLOCK_ALLIANCE_ENV_FILE`; `TASK_ADDRESS`, `USE_GPU`, `STORAGE_BACKEND`, and `NO_INCENTIVE` stay authoritative from OCM.
+6. `NUM_PARTICIPANTS` is restored from OCM only when `STORAGE_BACKEND=local`; testnet/S3 mode does not force it.
+7. The entrypoint appends CLI `--override` values before starting `FLockAlliance`.
 
 Example `AddOnDeploymentConfig`:
 

@@ -152,7 +152,6 @@ PRIVATE_KEY=0x...
 HF_TOKEN=hf_...
 BLOCKCHAIN_RPC=https://sepolia.base.org
 TOKEN_ADDRESS=0x...
-STORAGE_BACKEND=s3
 LOCAL_STORAGE_DIR=/data/shared
 ```
 
@@ -174,6 +173,7 @@ Should see:
 Default testnet mode:
 
 - `TASK_ADDRESS` is passed from the Hub
+- `STORAGE_BACKEND` and `NO_INCENTIVE` are controlled from the Hub deploy config
 - `BLOCKCHAIN_RPC` and `TOKEN_ADDRESS` are read from node `.env`
 - `PRIVATE_KEY` and `HF_TOKEN` are read from node `.env`
 
@@ -256,7 +256,8 @@ Notes:
 - `AddOnDeploymentConfig.customizedVariables` is still how runtime values are passed into the addon Pod.
 - Old Helm value paths such as `placement.all.config.useGpu` were removed during cleanup.
 - GPU resource scheduling is now controlled by the selected `AddOnTemplate`, while runtime flags such as `USE_GPU` still come from `AddOnDeploymentConfig`.
-- Non-empty values injected from OCM stay authoritative; the mounted `.env` is used to fill values left blank by the deploy config.
+- `TASK_ADDRESS`, `USE_GPU`, `STORAGE_BACKEND`, and `NO_INCENTIVE` stay authoritative from OCM.
+- `NUM_PARTICIPANTS` is forced from OCM only when `STORAGE_BACKEND=local`; it is not forced in testnet/S3 mode.
 
 ## Step 4: Enable the Addon on a Managed Cluster
 
@@ -314,7 +315,6 @@ HF_TOKEN=hf_...
 BLOCKCHAIN_RPC=http://<node-ip-or-service>:8545
 TOKEN_ADDRESS=0x...
 TASK_ADDRESS=0x...
-STORAGE_BACKEND=local
 LOCAL_STORAGE_DIR=/data/shared
 ```
 

@@ -106,17 +106,13 @@ spec:
                           echo "[flock-addon] nvidia-smi not available in image"
                         fi
 
-                        # Preserve non-empty values injected from OCM so the mounted
-                        # .env file can fill blanks, but does not override explicit
-                        # deploy-time settings such as TASK_ADDRESS or GPU mode.
-                        OCM_DATA_PATH="${DATA_PATH:-}"
-                        OCM_BLOCKCHAIN_RPC="${BLOCKCHAIN_RPC:-}"
-                        OCM_TOKEN_ADDRESS="${TOKEN_ADDRESS:-}"
+                        # Preserve the settings that are controlled centrally by OCM.
+                        # The mounted .env file still provides per-node secrets and
+                        # local connection details, but should not override the shared
+                        # deployment mode selected on the Hub.
                         OCM_TASK_ADDRESS="${TASK_ADDRESS:-}"
-                        OCM_STAKE="${STAKE:-}"
-                        OCM_STORAGE_BACKEND="${STORAGE_BACKEND:-}"
-                        OCM_LOCAL_STORAGE_DIR="${LOCAL_STORAGE_DIR:-}"
                         OCM_USE_GPU="${USE_GPU:-}"
+                        OCM_STORAGE_BACKEND="${STORAGE_BACKEND:-}"
                         OCM_NO_INCENTIVE="${NO_INCENTIVE:-}"
                         OCM_NUM_PARTICIPANTS="${NUM_PARTICIPANTS:-}"
 
@@ -126,16 +122,13 @@ spec:
                           set +a
                         fi
 
-                        if [ -n "${OCM_DATA_PATH:-}" ]; then export DATA_PATH="${OCM_DATA_PATH}"; fi
-                        if [ -n "${OCM_BLOCKCHAIN_RPC:-}" ]; then export BLOCKCHAIN_RPC="${OCM_BLOCKCHAIN_RPC}"; fi
-                        if [ -n "${OCM_TOKEN_ADDRESS:-}" ]; then export TOKEN_ADDRESS="${OCM_TOKEN_ADDRESS}"; fi
                         if [ -n "${OCM_TASK_ADDRESS:-}" ]; then export TASK_ADDRESS="${OCM_TASK_ADDRESS}"; fi
-                        if [ -n "${OCM_STAKE:-}" ]; then export STAKE="${OCM_STAKE}"; fi
-                        if [ -n "${OCM_STORAGE_BACKEND:-}" ]; then export STORAGE_BACKEND="${OCM_STORAGE_BACKEND}"; fi
-                        if [ -n "${OCM_LOCAL_STORAGE_DIR:-}" ]; then export LOCAL_STORAGE_DIR="${OCM_LOCAL_STORAGE_DIR}"; fi
                         if [ -n "${OCM_USE_GPU:-}" ]; then export USE_GPU="${OCM_USE_GPU}"; fi
+                        if [ -n "${OCM_STORAGE_BACKEND:-}" ]; then export STORAGE_BACKEND="${OCM_STORAGE_BACKEND}"; fi
                         if [ -n "${OCM_NO_INCENTIVE:-}" ]; then export NO_INCENTIVE="${OCM_NO_INCENTIVE}"; fi
-                        if [ -n "${OCM_NUM_PARTICIPANTS:-}" ]; then export NUM_PARTICIPANTS="${OCM_NUM_PARTICIPANTS}"; fi
+                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_NUM_PARTICIPANTS:-}" ]; then
+                          export NUM_PARTICIPANTS="${OCM_NUM_PARTICIPANTS}"
+                        fi
 
                         set -- python -u main.py \
                           --config config/conf.yaml \
@@ -145,8 +138,10 @@ spec:
                           --override "storage.backend=${STORAGE_BACKEND}" \
                           --override "storage.local.shared_dir=${LOCAL_STORAGE_DIR}" \
                           --override "training.no_incentive=${NO_INCENTIVE}" \
-                          --override "training.num_participants=${NUM_PARTICIPANTS}" \
                           --override "data.inputs=${DATA_PATH}"
+                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${NUM_PARTICIPANTS:-}" ]; then
+                          set -- "$@" --override "training.num_participants=${NUM_PARTICIPANTS}"
+                        fi
                         if [ -n "${BLOCKCHAIN_RPC:-}" ]; then
                           set -- "$@" --override "blockchain.rpc=${BLOCKCHAIN_RPC}"
                         fi
