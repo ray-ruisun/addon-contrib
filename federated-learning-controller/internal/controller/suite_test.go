@@ -95,13 +95,7 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
-	if cancel != nil {
-		cancel()
-	}
-	// If BeforeSuite failed before cfg initialization (e.g. missing envtest binaries),
-	// stopping the environment can panic in controller-runtime internals.
-	if testEnv != nil && cfg != nil {
-		err := testEnv.Stop()
-		Expect(err).NotTo(HaveOccurred())
-	}
+	cancel()
+	err := testEnv.Stop()
+	Expect(err).NotTo(HaveOccurred())
 })

@@ -72,11 +72,10 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	defer func() {
-		if err == nil {
-			return
+		if err != nil {
+			instance.Status.Message = err.Error()
+			instance.Status.Phase = flv1alpha1.PhaseFailed
 		}
-		instance.Status.Message = err.Error()
-		instance.Status.Phase = flv1alpha1.PhaseFailed
 		if e := r.Status().Update(ctx, instance); e != nil {
 			log.Errorf("failed to update the instance phase into failed: %v", e)
 		}
@@ -84,10 +83,10 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// deleting the instance, clean up the resources with finalizer
 	if instance.DeletionTimestamp != nil {
-		if err = r.pruneServerResources(ctx, instance); err != nil {
+		if err := r.pruneServerResources(ctx, instance); err != nil {
 			return ctrl.Result{}, err
 		}
-		if err = r.pruneClientResources(ctx, instance); err != nil {
+		if err := r.pruneClientResources(ctx, instance); err != nil {
 			return ctrl.Result{}, err
 		}
 		if controllerutil.RemoveFinalizer(instance, FederatedLearningFinalizer) {
@@ -114,41 +113,44 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if instance.Status.Phase == "" {
 		instance.Status.Phase = flv1alpha1.PhaseWaiting
 		instance.Status.Message = MessageWaitingReady
-		if err = r.Status().Update(ctx, instance); err != nil {
-			return ctrl.Result{}, err
+		if e := r.Status().Update(ctx, instance); e != nil {
+			return ctrl.Result{}, e
 		}
 	}
 
 	// Waiting -> Running
 	if instance.Status.Phase == flv1alpha1.PhaseWaiting || instance.Status.Phase == flv1alpha1.PhaseRunning {
-		err = r.deployPlacement(ctx, instance)
-		if err != nil {
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, err
-		}
+		switch instance.Spec.Framework {
+		case flv1alpha1.Flower:
+			if err = r.reconcileFlower(ctx, instance); err != nil {
+				log.Errorf("failed to reconcile Flower: %v", err)
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
+		default:
+			// OpenFL and other frameworks use the legacy path
+			err = r.deployPlacement(ctx, instance)
+			if err != nil {
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, err
+			}
 
-		// 1. server: storage, job (rounds, minAvailableClients)
-		serverErr := r.federatedLearningServer(ctx, instance)
-		if serverErr != nil {
-			log.Errorf("failed to create/update the server: %v", serverErr)
-			// FLock server step is pure spec validation; an error here is non-transient.
-			if instance.Spec.Framework == flv1alpha1.FLock {
-				err = serverErr
+			// 1. server: storage, job (rounds, minAvailableClients)
+			if err := r.federatedLearningServer(ctx, instance); err != nil {
+				log.Errorf("failed to create/update the server: %v", err)
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
+
+			// 2. client: placement(based on selected cluster -> Running), Running -> generate manifestwork
+			if err := r.federatedLearningClient(ctx, instance); err != nil {
+				log.Errorf("failed to create/update the clients: %v", err)
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-		}
-
-		// 2. client: placement(based on selected cluster -> Running), Running -> generate manifestwork
-		if err = r.federatedLearningClient(ctx, instance); err != nil {
-			log.Errorf("failed to create/update the clients: %v", err)
-			return ctrl.Result{}, err
 		}
 	}
 
-	// Running -> Completed
-	if instance.Status.Phase == flv1alpha1.PhaseRunning ||
-		instance.Status.Phase == flv1alpha1.PhaseCompleted {
-		if instance.Spec.Framework != flv1alpha1.FLock {
+	// Running -> Completed (OpenFL only; Flower stays Running until deleted)
+	if instance.Spec.Framework != flv1alpha1.Flower {
+		if instance.Status.Phase == flv1alpha1.PhaseRunning ||
+			instance.Status.Phase == flv1alpha1.PhaseCompleted {
 			job := &batchv1.Job{}
 			err = r.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: getSeverName(instance.Name)}, job)
 			if err != nil {
@@ -172,6 +174,29 @@ func (r *FederatedLearningReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// reconcileFlower handles the Flower 1.26.x SuperLink/SuperNode architecture.
+// It deploys SuperExec-ServerApp on the hub and SuperExec-ClientApp via ManifestWorkReplicaSet.
+func (r *FederatedLearningReconciler) reconcileFlower(ctx context.Context,
+	instance *flv1alpha1.FederatedLearning,
+) error {
+	// 1. Deploy placement for cluster selection
+	if err := r.deployPlacement(ctx, instance); err != nil {
+		return err
+	}
+
+	// 2. Deploy ServerApp Deployment on hub
+	if err := r.deployFlowerServerApp(ctx, instance); err != nil {
+		return fmt.Errorf("failed to deploy Flower ServerApp: %w", err)
+	}
+
+	// 3. Deploy ClientApp ManifestWorkReplicaSet
+	if err := r.deployFlowerClientApp(ctx, instance); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // TODO: enhance it

@@ -531,64 +531,16 @@ spec:
                           type: object
                         type: array
                     type: object
-                type: object
-              flockAlliance:
-                description: FLockAllianceSpec defines FLockAlliance specific runtime
-                  settings.
-                properties:
-                  blockchainRpc:
+                  supernode:
+                    default: flower-supernode.flower-addon:9094
+                    description: |-
+                      SuperNode is the endpoint of the pre-deployed SuperNode ClientAppIO API.
+                      Format: <service>.<namespace>:<port>
                     type: string
-                  dataVolumeClaimName:
-                    description: Required when dataVolumeType=pvc.
-                    type: string
-                  dataVolumeType:
-                    default: hostPath
-                    enum:
-                    - hostPath
-                    - emptyDir
-                    - pvc
-                    type: string
-                  localSharedDir:
-                    default: /data/shared
-                    type: string
-                  noIncentive:
-                    default: false
-                    type: boolean
-                  numParticipants:
-                    default: 1
-                    minimum: 1
-                    type: integer
-                  runtimeMode:
-                    default: local
-                    enum:
-                    - docker
-                    - local
-                    type: string
-                  stake:
-                    default: "0"
-                    type: string
-                  storageBackend:
-                    default: s3
-                    enum:
-                    - s3
-                    - local
-                    type: string
-                  taskAddress:
-                    type: string
-                  tokenAddress:
-                    type: string
-                  useGpu:
-                    default: false
-                    type: boolean
                 type: object
               framework:
                 default: other
                 description: Framework represents the federated learning framework.
-                enum:
-                - flower
-                - openfl
-                - flock
-                - other
                 type: string
               server:
                 description: ServerSpec defines the specification for the server in
@@ -650,6 +602,12 @@ spec:
                         description: StorageType represents the type of storage.
                         type: string
                     type: object
+                  superlink:
+                    default: superlink.flower-system:9091
+                    description: |-
+                      SuperLink is the endpoint of the pre-deployed SuperLink exec API.
+                      Format: <service>.<namespace>:<port>
+                    type: string
                 type: object
             type: object
           status:

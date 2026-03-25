@@ -20,7 +20,7 @@ This repository contains the following OCM addons:
 - **device-addon**: Enables device management functionality within the OCM ecosystem
 - **dynamic-scoring-framework**: A framework for distributed evaluation across multiclusters and centralized aggregation
 - **federated-learning-controller**: Implements federated learning capabilities across distributed clusters
-- **flock-addon**: Deploys FLockAlliance as a direct-client federated learning addon
+- **flock-addon**: Deploys FLockAlliance direct client workloads to managed clusters via OCM
 - **fluid-addon**: Integrates Fluid for data orchestration and management in multicluster environments
 - **hellospoke-addon**: A simple example addon demonstrating basic OCM addon development patterns
 - **kueue-addon**: Integrates Kueue for advanced multicluster batch job scheduling and queue management

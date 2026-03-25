@@ -3,6 +3,8 @@
 This guide enables automatic addon installation through OCM Placement.
 
 Use this only when you want the Hub to install or remove the addon automatically based on cluster labels or clustersets.
+Auto-install targets accept the same image overrides as manual deploy (`IMAGE_OWNER`, `IMAGE_TAG`,
+`FLOCK_ALLIANCE_IMAGE`, `IMAGE_PULL_SECRET`) and optional blockchain overrides (`TASK_ADDRESS`, `RPC`, `TOKEN_ADDRESS`).
 
 ## How It Works
 
@@ -16,7 +18,8 @@ This is an alternative to manual `make enable-addon CLUSTER=...`.
 
 ```bash
 # [Hub]
-make deploy-auto-gpu
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
+TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924' make deploy-auto-gpu
 kubectl label managedcluster cluster1 gpu=true
 ```
 
@@ -37,7 +40,8 @@ Should see:
 
 ```bash
 # [Hub]
-make deploy-auto-all
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
+TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924' make deploy-auto-all
 ```
 
 Check:

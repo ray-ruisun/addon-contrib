@@ -53,24 +53,7 @@ type Framework string
 const (
 	Flower Framework = "flower"
 	OpenFL Framework = "openfl"
-	FLock  Framework = "flock"
 	Other  Framework = "other"
-)
-
-const (
-	FLockAllianceRuntimeDocker = "docker"
-	FLockAllianceRuntimeLocal  = "local"
-)
-
-const (
-	FLockAllianceStorageS3    = "s3"
-	FLockAllianceStorageLocal = "local"
-)
-
-const (
-	FLockAllianceDataVolumeHostPath = "hostPath"
-	FLockAllianceDataVolumeEmptyDir = "emptyDir"
-	FLockAllianceDataVolumePVC      = "pvc"
 )
 
 const (
@@ -80,49 +63,21 @@ const (
 // FederatedLearningSpec defines the desired state of FederatedLearning.
 type FederatedLearningSpec struct {
 	// +kubebuilder:default=other
-	Framework     Framework         `json:"framework,omitempty"`
-	Server        ServerSpec        `json:"server,omitempty"`
-	Client        ClientSpec        `json:"client,omitempty"`
-	FLockAlliance FLockAllianceSpec `json:"flockAlliance,omitempty"`
-}
-
-// FLockAllianceSpec defines FLockAlliance specific runtime settings.
-type FLockAllianceSpec struct {
-	// +kubebuilder:default=local
-	// +kubebuilder:validation:Enum=docker;local
-	RuntimeMode string `json:"runtimeMode,omitempty"`
-	// +kubebuilder:default=false
-	UseGPU bool `json:"useGpu,omitempty"`
-
-	BlockchainRPC string `json:"blockchainRpc,omitempty"`
-	TokenAddress  string `json:"tokenAddress,omitempty"`
-	TaskAddress   string `json:"taskAddress,omitempty"`
-	// +kubebuilder:default=0
-	Stake string `json:"stake,omitempty"`
-
-	// +kubebuilder:default=s3
-	// +kubebuilder:validation:Enum=s3;local
-	StorageBackend string `json:"storageBackend,omitempty"`
-	// +kubebuilder:default=/data/shared
-	LocalSharedDir string `json:"localSharedDir,omitempty"`
-
-	// +kubebuilder:default=false
-	NoIncentive bool `json:"noIncentive,omitempty"`
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	NumParticipants int `json:"numParticipants,omitempty"`
-
-	// +kubebuilder:default=hostPath
-	// +kubebuilder:validation:Enum=hostPath;emptyDir;pvc
-	DataVolumeType string `json:"dataVolumeType,omitempty"`
-	// Required when dataVolumeType=pvc.
-	DataVolumeClaimName string `json:"dataVolumeClaimName,omitempty"`
+	Framework Framework  `json:"framework,omitempty"`
+	Server    ServerSpec `json:"server,omitempty"`
+	Client    ClientSpec `json:"client,omitempty"`
 }
 
 // ClientSpec defines the specification for the client in federated learning.
 type ClientSpec struct {
 	Image     string                        `json:"image,omitempty"`
 	Placement clustersv1beta1.PlacementSpec `json:"placement,omitempty"`
+
+	// SuperNode is the endpoint of the pre-deployed SuperNode ClientAppIO API.
+	// Format: <service>.<namespace>:<port>
+	// +kubebuilder:default="flower-supernode.flower-addon:9094"
+	// +optional
+	SuperNode string `json:"supernode,omitempty"`
 }
 
 // ServerSpec defines the specification for the server in federated learning.
@@ -133,6 +88,12 @@ type ServerSpec struct {
 	MinAvailableClients int              `json:"minAvailableClients,omitempty"`
 	Listeners           []ListenerSpec   `json:"listeners,omitempty"`
 	Storage             ModelStorageSpec `json:"storage,omitempty"`
+
+	// SuperLink is the endpoint of the pre-deployed SuperLink exec API.
+	// Format: <service>.<namespace>:<port>
+	// +kubebuilder:default="superlink.flower-system:9091"
+	// +optional
+	SuperLink string `json:"superlink,omitempty"`
 }
 
 // ModelStorageSpec defines the storage specification for the model.

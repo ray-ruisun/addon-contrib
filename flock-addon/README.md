@@ -806,12 +806,16 @@ spec:
 ## Placement Auto-Install
 
 Use placement mode only if you want the addon to be installed automatically based on cluster labels or clustersets.
+`deploy-auto-gpu` and `deploy-auto-all` use the same image variables as `deploy`/`deploy-testnet`
+(`IMAGE_OWNER`, `IMAGE_TAG`, `FLOCK_ALLIANCE_IMAGE`, `IMAGE_PULL_SECRET`) and also accept optional
+`TASK_ADDRESS`, `RPC`, and `TOKEN_ADDRESS`.
 
 ### GPU placement
 
 ```bash
 # [Hub]
-make deploy-auto-gpu
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
+TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924' make deploy-auto-gpu
 kubectl label managedcluster cluster1 gpu=true
 ```
 
@@ -832,7 +836,8 @@ Should see:
 
 ```bash
 # [Hub]
-make deploy-auto-all
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
+TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924' make deploy-auto-all
 ```
 
 Check:
