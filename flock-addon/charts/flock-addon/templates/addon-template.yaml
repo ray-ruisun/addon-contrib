@@ -114,6 +114,13 @@ spec:
                         OCM_TOKEN_ADDRESS="${TOKEN_ADDRESS:-}"
                         OCM_TASK_ADDRESS="${TASK_ADDRESS:-}"
                         OCM_LOCAL_STORAGE_DIR="${LOCAL_STORAGE_DIR:-}"
+                        OCM_S3_COMPAT_ENDPOINT_URL="${S3_COMPAT_ENDPOINT_URL:-}"
+                        OCM_S3_COMPAT_BUCKET="${S3_COMPAT_BUCKET:-}"
+                        OCM_S3_COMPAT_ACCESS_KEY="${S3_COMPAT_ACCESS_KEY:-}"
+                        OCM_S3_COMPAT_SECRET_KEY="${S3_COMPAT_SECRET_KEY:-}"
+                        OCM_S3_COMPAT_REGION="${S3_COMPAT_REGION:-}"
+                        OCM_S3_COMPAT_ADDRESSING_STYLE="${S3_COMPAT_ADDRESSING_STYLE:-}"
+                        OCM_S3_COMPAT_VERIFY_SSL="${S3_COMPAT_VERIFY_SSL:-}"
                         OCM_USE_GPU="${USE_GPU:-}"
                         OCM_STORAGE_BACKEND="${STORAGE_BACKEND:-}"
                         OCM_NO_INCENTIVE="${NO_INCENTIVE:-}"
@@ -140,6 +147,33 @@ spec:
                         fi
                         if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_NUM_PARTICIPANTS:-}" ]; then
                           export NUM_PARTICIPANTS="${OCM_NUM_PARTICIPANTS}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_BLOCKCHAIN_RPC:-}" ]; then
+                          export BLOCKCHAIN_RPC="${OCM_BLOCKCHAIN_RPC}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_TOKEN_ADDRESS:-}" ]; then
+                          export TOKEN_ADDRESS="${OCM_TOKEN_ADDRESS}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_ENDPOINT_URL:-}" ]; then
+                          export S3_COMPAT_ENDPOINT_URL="${OCM_S3_COMPAT_ENDPOINT_URL}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_BUCKET:-}" ]; then
+                          export S3_COMPAT_BUCKET="${OCM_S3_COMPAT_BUCKET}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_ACCESS_KEY:-}" ]; then
+                          export S3_COMPAT_ACCESS_KEY="${OCM_S3_COMPAT_ACCESS_KEY}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_SECRET_KEY:-}" ]; then
+                          export S3_COMPAT_SECRET_KEY="${OCM_S3_COMPAT_SECRET_KEY}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_REGION:-}" ]; then
+                          export S3_COMPAT_REGION="${OCM_S3_COMPAT_REGION}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_ADDRESSING_STYLE:-}" ]; then
+                          export S3_COMPAT_ADDRESSING_STYLE="${OCM_S3_COMPAT_ADDRESSING_STYLE}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_VERIFY_SSL:-}" ]; then
+                          export S3_COMPAT_VERIFY_SSL="${OCM_S3_COMPAT_VERIFY_SSL}"
                         fi
 
                         set -- python -u main.py \
@@ -180,6 +214,20 @@ spec:
                         value: "{{`{{STORAGE_BACKEND}}`}}"
                       - name: LOCAL_STORAGE_DIR
                         value: "{{`{{LOCAL_STORAGE_DIR}}`}}"
+                      - name: S3_COMPAT_ENDPOINT_URL
+                        value: "{{`{{S3_COMPAT_ENDPOINT_URL}}`}}"
+                      - name: S3_COMPAT_BUCKET
+                        value: "{{`{{S3_COMPAT_BUCKET}}`}}"
+                      - name: S3_COMPAT_ACCESS_KEY
+                        value: "{{`{{S3_COMPAT_ACCESS_KEY}}`}}"
+                      - name: S3_COMPAT_SECRET_KEY
+                        value: "{{`{{S3_COMPAT_SECRET_KEY}}`}}"
+                      - name: S3_COMPAT_REGION
+                        value: "{{`{{S3_COMPAT_REGION}}`}}"
+                      - name: S3_COMPAT_ADDRESSING_STYLE
+                        value: "{{`{{S3_COMPAT_ADDRESSING_STYLE}}`}}"
+                      - name: S3_COMPAT_VERIFY_SSL
+                        value: "{{`{{S3_COMPAT_VERIFY_SSL}}`}}"
                       - name: USE_GPU
                         value: "{{`{{USE_GPU}}`}}"
                       - name: NO_INCENTIVE

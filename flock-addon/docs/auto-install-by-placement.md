@@ -89,7 +89,8 @@ Placement mode uses the built-in CPU/GPU config pair automatically:
 `customizedVariables` are still the runtime injection mechanism. What was removed
 were the old chart value paths that used to feed some of those variables.
 `TASK_ADDRESS`, `USE_GPU`, `STORAGE_BACKEND`, and `NO_INCENTIVE` stay authoritative
-from OCM. When `STORAGE_BACKEND=local`, `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`, and
+from OCM. In testnet mode, `BLOCKCHAIN_RPC` comes from the mounted `.env`.
+When `STORAGE_BACKEND=local`, `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`, and
 `LOCAL_STORAGE_DIR` also stay authoritative from OCM when non-empty.
 `NUM_PARTICIPANTS` is forced from OCM only when `STORAGE_BACKEND=local`; other
 runtime keys can come from the mounted `.env` on each cluster node.

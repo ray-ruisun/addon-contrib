@@ -65,8 +65,16 @@ deploymentConfig:
     flockAllianceEnvFile: "/data/.env"
 
   storage:
-    backend: "s3" # s3 | local
+    backend: "s3" # s3 | local | nami
     localSharedDir: "/data/shared"
+    s3Compat:
+      endpointUrl: ""
+      bucket: ""
+      accessKey: ""
+      secretKey: ""
+      region: "us-east-1"
+      addressingStyle: "path"
+      verifySsl: "false"
 
 placement:
   gpu:

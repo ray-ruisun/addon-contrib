@@ -2,6 +2,26 @@
 
 This guide installs the FLock addon on Open Cluster Management (OCM) and deploys `FLockAlliance` to managed clusters.
 
+## Primary Deployment Modes
+
+The main supported deployment modes are:
+
+1. `make deploy-testnet`
+   - testnet blockchain
+   - original signer-based `s3` storage backend
+   - Hub does not push `BLOCKCHAIN_RPC`
+2. `make deploy-local-chain-s3`
+   - Hub automatically starts the local chain
+   - original signer-based `s3` storage backend
+   - Hub pushes the local-chain `BLOCKCHAIN_RPC`
+3. `make deploy-local-chain-s3-compatible`
+   - Hub automatically starts the local chain
+   - Hub automatically starts local S3-compatible storage
+   - Hub uploads `MODEL_ARCHIVE` into object storage using the SHA256 as the object key
+   - Hub pushes the local-chain `BLOCKCHAIN_RPC`
+
+The older shared-filesystem local mode remains available as a legacy path.
+
 ## What Gets Deployed
 
 - Hub cluster:
@@ -152,7 +172,6 @@ PRIVATE_KEY=0x...
 HF_TOKEN=hf_...
 BLOCKCHAIN_RPC=https://sepolia.base.org
 TOKEN_ADDRESS=0x...
-LOCAL_STORAGE_DIR=/data/shared
 ```
 
 Check:
@@ -167,6 +186,47 @@ Should see:
 
 - `.env` exists at `/data/flock-client/.env`
 - required keys are present
+
+Mode-specific `.env` requirements:
+
+| Variable | `deploy-testnet` | `deploy-local-chain-s3` | `deploy-local-chain-s3-compatible` |
+| --- | --- | --- | --- |
+| `PRIVATE_KEY` | required | required | required |
+| `HF_TOKEN` | required | required | required |
+| `BLOCKCHAIN_RPC` | required, from node `.env` | not needed from `.env` | not needed from `.env` |
+| `TOKEN_ADDRESS` | optional from `.env` when Hub leaves it empty | not needed from `.env` | not needed from `.env` |
+| `S3_COMPAT_ENDPOINT_URL` | not used | not used | auto-pushed from Hub |
+| `S3_COMPAT_BUCKET` | not used | not used | auto-pushed from Hub |
+| `S3_COMPAT_ACCESS_KEY` | not used | not used | auto-pushed from Hub |
+| `S3_COMPAT_SECRET_KEY` | not used | not used | auto-pushed from Hub |
+| `S3_COMPAT_REGION` | not used | not used | auto-pushed from Hub |
+| `S3_COMPAT_ADDRESSING_STYLE` | not used | not used | auto-pushed from Hub |
+| `S3_COMPAT_VERIFY_SSL` | not used | not used | auto-pushed from Hub |
+
+Examples:
+
+`deploy-testnet`
+
+```dotenv
+PRIVATE_KEY=0x...
+HF_TOKEN=hf_...
+BLOCKCHAIN_RPC=https://sepolia.base.org
+TOKEN_ADDRESS=0x...
+```
+
+`deploy-local-chain-s3`
+
+```dotenv
+PRIVATE_KEY=0x...
+HF_TOKEN=hf_...
+```
+
+`deploy-local-chain-s3-compatible`
+
+```dotenv
+PRIVATE_KEY=0x...
+HF_TOKEN=hf_...
+```
 
 ## Step 3: Deploy the Addon Definition on the Hub
 
@@ -257,7 +317,8 @@ Notes:
 - Old Helm value paths such as `placement.all.config.useGpu` were removed during cleanup.
 - GPU resource scheduling is now controlled by the selected `AddOnTemplate`, while runtime flags such as `USE_GPU` still come from `AddOnDeploymentConfig`.
 - `TASK_ADDRESS`, `USE_GPU`, `STORAGE_BACKEND`, and `NO_INCENTIVE` stay authoritative from OCM.
-- when `STORAGE_BACKEND=local`, `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`, and `LOCAL_STORAGE_DIR` also stay authoritative from OCM when non-empty.
+- in testnet mode, `BLOCKCHAIN_RPC` comes from each node `.env`.
+- when `STORAGE_BACKEND=local`, `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`, and `LOCAL_STORAGE_DIR` stay authoritative from OCM when non-empty.
 - `NUM_PARTICIPANTS` is forced from OCM only when `STORAGE_BACKEND=local`; it is not forced in testnet/S3 mode.
 
 ## Step 4: Enable the Addon on a Managed Cluster
@@ -304,7 +365,80 @@ Should see:
 - on CPU clusters, the GPU request fields are empty and the Pod still runs
 - at least one GPU-enabled node shows non-empty `GPU_ALLOCATABLE`
 
-## Local Chain Mode
+## Local Chain + Original S3 Mode
+
+Use this mode when:
+
+- the Hub should auto-start the local chain
+- storage should still use the original signer-based `s3` backend
+- the Hub should push the local-chain `BLOCKCHAIN_RPC`
+
+Deploy:
+
+```bash
+# [Hub]
+make deploy-local-chain-s3 \
+  FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client \
+  MODEL_ARCHIVE=/path/to/model.tar.gz \
+  RPC_HOST=<hub-ip>
+```
+
+What it does:
+
+- computes `MODEL_HASH` from `MODEL_ARCHIVE`
+- runs `make chain` in `FL-Alliance-Client`
+- reads `TOKEN_ADDRESS` and `TASK_ADDRESS` from `data/contracts.json`
+- deploys `storage.backend=s3`
+- pushes `BLOCKCHAIN_RPC=http://<hub-ip>:8545`
+
+Managed cluster node `.env` still needs:
+
+```dotenv
+PRIVATE_KEY=0x...
+HF_TOKEN=hf_...
+```
+
+Check:
+
+```bash
+# [Hub]
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "BLOCKCHAIN_RPC|TOKEN_ADDRESS|TASK_ADDRESS|STORAGE_BACKEND|value"
+
+# [Hub]
+test -f /path/to/FL-Alliance-Client/data/contracts.json && \
+python3 - <<'PY'
+import json
+data = json.load(open('/path/to/FL-Alliance-Client/data/contracts.json'))
+print("TOKEN_ADDRESS=", data["FlockToken"]["address"])
+print("TASK_ADDRESS=", data["FlockTask"]["address"])
+PY
+```
+
+Should see:
+
+- `STORAGE_BACKEND` is `s3`
+- `BLOCKCHAIN_RPC` points to `http://<hub-ip>:8545`
+- `TASK_ADDRESS` matches the Hub-generated value
+
+After enabling the addon on a managed cluster, verify runtime:
+
+```bash
+# [Hub]
+make enable-addon CLUSTER=<cluster-name>
+
+# [Managed Cluster context]
+kubectl -n flock-system get deploy,pod
+kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=100
+```
+
+Should see:
+
+- `deployment/flock-agent` exists
+- Pod becomes `Running`
+- logs include the local-chain `TASK_ADDRESS`
+- logs do not show missing `BLOCKCHAIN_RPC` errors
+
+## Legacy: Local Chain + Shared Filesystem Mode
 
 Use local chain mode only if the blockchain endpoint is reachable from the addon Pod.
 
@@ -400,3 +534,103 @@ Should see:
 - `STORAGE_BACKEND` is `local`
 - `LOCAL_STORAGE_DIR` is `/data/shared`
 - `TOKEN_ADDRESS` / `TASK_ADDRESS` are present only if you passed them from the Hub
+
+## Local Chain + Local S3-Compatible Storage Mode
+
+Use this mode when the Hub should host both the local chain and a local
+S3-compatible object store such as MinIO.
+
+Important:
+
+- this mode uses `storage.backend=nami`
+- the Hub starts local S3-compatible storage automatically
+- the Hub uploads `MODEL_ARCHIVE` automatically
+- the Hub pushes the local-chain `BLOCKCHAIN_RPC`
+- the Hub auto-pushes `S3_COMPAT_ENDPOINT_URL`, `S3_COMPAT_BUCKET`,
+  `S3_COMPAT_ACCESS_KEY`, `S3_COMPAT_SECRET_KEY`, `S3_COMPAT_REGION`,
+  `S3_COMPAT_ADDRESSING_STYLE`, and `S3_COMPAT_VERIFY_SSL`
+- nodes only need their own local secrets such as `PRIVATE_KEY` and `HF_TOKEN`
+
+The command auto-starts MinIO-compatible storage and auto-creates the bucket.
+The manual startup below is only useful if you want to debug the Hub-side object
+store separately.
+
+Optional manual local S3-compatible service on the Hub:
+
+```bash
+# [Hub]
+mkdir -p /srv/minio/data
+docker run -d \
+  --name minio \
+  -p 9000:9000 \
+  -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin \
+  -e MINIO_ROOT_PASSWORD=minioadmin \
+  -v /srv/minio/data:/data \
+  quay.io/minio/minio server /data --console-address ":9001"
+```
+
+Check:
+
+```bash
+# [Hub]
+docker ps | rg minio
+curl http://127.0.0.1:9000/minio/health/live
+```
+
+Should see:
+
+- a running `minio` container
+- an `OK` response from the health endpoint
+
+Each managed cluster node `.env` should keep only node-local secrets:
+
+```dotenv
+PRIVATE_KEY=0x...
+HF_TOKEN=hf_...
+```
+
+Deploy:
+
+```bash
+# [Hub]
+make deploy-local-chain-s3-compatible \
+  FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client \
+  MODEL_ARCHIVE=/path/to/model.tar.gz \
+  RPC_HOST=<hub-ip>
+```
+
+Check:
+
+```bash
+# [Hub]
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "STORAGE_BACKEND|TASK_ADDRESS|value"
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "S3_COMPAT_ENDPOINT_URL|S3_COMPAT_BUCKET|S3_COMPAT_ACCESS_KEY|S3_COMPAT_REGION|value"
+
+# [Hub]
+docker ps | rg 'flock-minio|minio'
+curl http://127.0.0.1:9000/minio/health/live
+
+# [Hub]
+python3 - <<'PY'
+import json
+data = json.load(open('/path/to/FL-Alliance-Client/data/contracts.json'))
+print("TOKEN_ADDRESS=", data["FlockToken"]["address"])
+print("TASK_ADDRESS=", data["FlockTask"]["address"])
+PY
+
+# [Managed Cluster context]
+kubectl -n flock-system logs deploy/flock-agent -c flock-alliance-client --tail=80 | rg -n "S3-compatible|storage backend|nami"
+POD=$(kubectl -n flock-system get pod -l app.kubernetes.io/component=agent -o jsonpath='{.items[0].metadata.name}')
+kubectl -n flock-system exec "$POD" -c flock-alliance-client -- sh -lc 'printenv | rg "S3_COMPAT_|BLOCKCHAIN_RPC|TASK_ADDRESS|TOKEN_ADDRESS"'
+```
+
+Should see:
+
+- `STORAGE_BACKEND` is `nami`
+- `BLOCKCHAIN_RPC` points to `http://<hub-ip>:8545`
+- `TASK_ADDRESS` matches the Hub-generated value
+- `S3_COMPAT_ENDPOINT_URL` points to `http://<hub-ip>:9000`
+- client logs include `Using direct S3-compatible storage backend`
+- Hub-side MinIO container is running and health returns `OK`
+- the Pod environment contains `S3_COMPAT_ENDPOINT_URL`, `S3_COMPAT_BUCKET`, and the Hub-pushed local-chain addresses

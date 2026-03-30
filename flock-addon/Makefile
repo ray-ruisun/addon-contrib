@@ -1,5 +1,6 @@
 KUBECTL ?= kubectl
 HELM ?= helm
+DOCKER ?= docker
 NAMESPACE ?= open-cluster-management
 RELEASE_NAME ?= flock-addon
 CHART_PATH ?= charts/flock-addon
@@ -18,6 +19,18 @@ MODEL_ARCHIVE ?=
 RPC_HOST ?=
 HUB_SHARED_MODELS_DIR ?=
 CHAIN_DOCKER_COMPOSE ?=
+MINIO_IMAGE ?= quay.io/minio/minio
+MINIO_MC_IMAGE ?= quay.io/minio/mc
+S3_COMPAT_CONTAINER_NAME ?= flock-minio
+S3_COMPAT_DATA_DIR ?= /srv/flock-minio/data
+S3_COMPAT_PORT ?= 9000
+S3_COMPAT_CONSOLE_PORT ?= 9001
+S3_COMPAT_ACCESS_KEY ?= minioadmin
+S3_COMPAT_SECRET_KEY ?= minioadmin
+S3_COMPAT_BUCKET ?= flock-dev
+S3_COMPAT_REGION ?= us-east-1
+S3_COMPAT_ADDRESSING_STYLE ?= path
+S3_COMPAT_VERIFY_SSL ?= false
 
 ifneq ($(strip $(IMAGE_PULL_SECRET)),)
 IMAGE_PULL_SECRET_ARG := --set image.pullSecrets[0]='$(IMAGE_PULL_SECRET)'
@@ -50,14 +63,69 @@ upgrade: ## Upgrade FLock addon with current image/runtime values
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
-		--set deploymentConfig.blockchain.rpc='$(RPC)' \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
 .PHONY: deploy-testnet
-deploy-testnet: ## Deploy for testnet mode (usage: make deploy-testnet TASK_ADDRESS=0x... [RPC=https://...] [TOKEN_ADDRESS=0x...])
+deploy-testnet: ## Deploy for testnet mode (usage: make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...])
 ifndef TASK_ADDRESS
-	$(error TASK_ADDRESS is not set. Usage: make deploy-testnet TASK_ADDRESS=0x... [RPC=https://...] [TOKEN_ADDRESS=0x...])
+	$(error TASK_ADDRESS is not set. Usage: make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...])
+endif
+	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
+		--set addon.installStrategy=Manual \
+		--set placement.gpu.enabled=false \
+		--set placement.all.enabled=false \
+		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
+		$(IMAGE_PULL_SECRET_ARG) \
+		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
+		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
+		--set deploymentConfig.storage.backend='s3'
+
+.PHONY: _deploy-s3-compatible
+_deploy-s3-compatible:
+	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
+		--set addon.installStrategy=Manual \
+		--set placement.gpu.enabled=false \
+		--set placement.all.enabled=false \
+		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
+		$(IMAGE_PULL_SECRET_ARG) \
+		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
+		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
+		--set deploymentConfig.storage.backend='nami'
+
+.PHONY: _deploy-local-chain-s3-compatible
+_deploy-local-chain-s3-compatible:
+ifndef RPC
+	$(error RPC is not set. Usage: make _deploy-local-chain-s3-compatible RPC=http://<hub-ip>:8545 [TOKEN_ADDRESS=0x...] [TASK_ADDRESS=0x...])
+endif
+	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
+		--set addon.installStrategy=Manual \
+		--set placement.gpu.enabled=false \
+		--set placement.all.enabled=false \
+		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
+		$(IMAGE_PULL_SECRET_ARG) \
+		--set deploymentConfig.blockchain.rpc='$(RPC)' \
+		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
+		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
+		--set deploymentConfig.storage.s3Compat.endpointUrl='$(S3_COMPAT_ENDPOINT_URL)' \
+		--set deploymentConfig.storage.s3Compat.bucket='$(S3_COMPAT_BUCKET)' \
+		--set deploymentConfig.storage.s3Compat.accessKey='$(S3_COMPAT_ACCESS_KEY)' \
+		--set deploymentConfig.storage.s3Compat.secretKey='$(S3_COMPAT_SECRET_KEY)' \
+		--set deploymentConfig.storage.s3Compat.region='$(S3_COMPAT_REGION)' \
+		--set deploymentConfig.storage.s3Compat.addressingStyle='$(S3_COMPAT_ADDRESSING_STYLE)' \
+		--set deploymentConfig.storage.s3Compat.verifySsl='$(S3_COMPAT_VERIFY_SSL)' \
+		--set deploymentConfig.storage.backend='nami'
+
+.PHONY: _deploy-local-chain-s3
+_deploy-local-chain-s3:
+ifndef RPC
+	$(error RPC is not set. Usage: make _deploy-local-chain-s3 RPC=http://<hub-ip>:8545 [TOKEN_ADDRESS=0x...] [TASK_ADDRESS=0x...])
 endif
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set addon.installStrategy=Manual \
@@ -73,7 +141,7 @@ endif
 		--set deploymentConfig.storage.backend='s3'
 
 .PHONY: deploy-local-chain
-deploy-local-chain: ## Deploy for hub-hosted local chain + shared local storage (usage: make deploy-local-chain RPC=http://<hub-ip>:8545 [TOKEN_ADDRESS=0x...] [TASK_ADDRESS=0x...])
+deploy-local-chain:
 ifndef RPC
 	$(error RPC is not set. Usage: make deploy-local-chain RPC=http://<hub-ip>:8545 [TOKEN_ADDRESS=0x...] [TASK_ADDRESS=0x...])
 endif
@@ -94,7 +162,7 @@ endif
 		--set deploymentConfig.storage.localSharedDir='$(LOCAL_STORAGE_DIR)'
 
 .PHONY: deploy-local-stack
-deploy-local-stack: ## Start local chain on the Hub via FL-Alliance-Client, then deploy flock-addon (requires FL_ALLIANCE_CLIENT_DIR, MODEL_ARCHIVE, RPC_HOST)
+deploy-local-stack:
 ifndef FL_ALLIANCE_CLIENT_DIR
 	$(error FL_ALLIANCE_CLIENT_DIR is not set. Usage: make deploy-local-stack FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
 endif
@@ -131,6 +199,106 @@ endif
 		TOKEN_ADDRESS="$$TOKEN_ADDRESS" \
 		TASK_ADDRESS="$$TASK_ADDRESS"
 
+.PHONY: start-local-s3-compatible
+start-local-s3-compatible:
+	@set -e; \
+	mkdir -p '$(S3_COMPAT_DATA_DIR)'; \
+	if $(DOCKER) ps -a --format '{{.Names}}' | grep -qx '$(S3_COMPAT_CONTAINER_NAME)'; then \
+		$(DOCKER) rm -f '$(S3_COMPAT_CONTAINER_NAME)' >/dev/null; \
+	fi; \
+	$(DOCKER) run -d \
+		--name '$(S3_COMPAT_CONTAINER_NAME)' \
+		-p '$(S3_COMPAT_PORT):9000' \
+		-p '$(S3_COMPAT_CONSOLE_PORT):9001' \
+		-e MINIO_ROOT_USER='$(S3_COMPAT_ACCESS_KEY)' \
+		-e MINIO_ROOT_PASSWORD='$(S3_COMPAT_SECRET_KEY)' \
+		-v '$(S3_COMPAT_DATA_DIR):/data' \
+		'$(MINIO_IMAGE)' server /data --console-address ":9001" >/dev/null; \
+	echo "Started local S3-compatible storage at http://127.0.0.1:$(S3_COMPAT_PORT)"; \
+	sleep 3; \
+	$(DOCKER) run --rm --network host '$(MINIO_MC_IMAGE)' sh -ec '\
+		mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && \
+		mc mb --ignore-existing local/$(S3_COMPAT_BUCKET) >/dev/null'; \
+	echo "Ensured bucket $(S3_COMPAT_BUCKET) exists"
+
+.PHONY: deploy-local-chain-s3
+deploy-local-chain-s3: ## Auto-start local chain on the Hub, read contract addresses, then deploy addon with original signer-based S3 storage
+ifndef FL_ALLIANCE_CLIENT_DIR
+	$(error FL_ALLIANCE_CLIENT_DIR is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
+endif
+ifndef MODEL_ARCHIVE
+	$(error MODEL_ARCHIVE is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
+endif
+ifndef RPC_HOST
+	$(error RPC_HOST is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
+endif
+	@set -e; \
+	MODEL_HASH=$$(sha256sum '$(MODEL_ARCHIVE)' | cut -d' ' -f1); \
+	echo "MODEL_HASH=$$MODEL_HASH"; \
+	$(MAKE) -C '$(FL_ALLIANCE_CLIENT_DIR)' chain \
+		$(if $(strip $(CHAIN_DOCKER_COMPOSE)),DOCKER_COMPOSE='$(CHAIN_DOCKER_COMPOSE)') \
+		MODEL_DEFINITION_HASH="$$MODEL_HASH" \
+		$(if $(strip $(ROUNDS)),ROUNDS='$(ROUNDS)') \
+		$(if $(strip $(MIN_PARTICIPANTS)),MIN_PARTICIPANTS='$(MIN_PARTICIPANTS)') \
+		$(if $(strip $(TIME_TO_PROPOSE)),TIME_TO_PROPOSE='$(TIME_TO_PROPOSE)') \
+		$(if $(strip $(TIME_TO_VOTE)),TIME_TO_VOTE='$(TIME_TO_VOTE)'); \
+	TOKEN_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockToken']['address'])"); \
+	TASK_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockTask']['address'])"); \
+	echo "TOKEN_ADDRESS=$$TOKEN_ADDRESS"; \
+	echo "TASK_ADDRESS=$$TASK_ADDRESS"; \
+	$(MAKE) _deploy-local-chain-s3 \
+		RPC='http://$(RPC_HOST):8545' \
+		TOKEN_ADDRESS="$$TOKEN_ADDRESS" \
+		TASK_ADDRESS="$$TASK_ADDRESS"
+
+.PHONY: deploy-local-chain-s3-compatible
+deploy-local-chain-s3-compatible: ## Auto-start local chain and local S3-compatible storage on the Hub, upload model archive, then deploy addon
+ifndef FL_ALLIANCE_CLIENT_DIR
+	$(error FL_ALLIANCE_CLIENT_DIR is not set. Usage: make deploy-local-chain-s3-compatible FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
+endif
+ifndef MODEL_ARCHIVE
+	$(error MODEL_ARCHIVE is not set. Usage: make deploy-local-chain-s3-compatible FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
+endif
+ifndef RPC_HOST
+	$(error RPC_HOST is not set. Usage: make deploy-local-chain-s3-compatible FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
+endif
+	@set -e; \
+	MODEL_HASH=$$(sha256sum '$(MODEL_ARCHIVE)' | cut -d' ' -f1); \
+	MODEL_DIR=$$(cd "$$(dirname '$(MODEL_ARCHIVE)')" && pwd); \
+	MODEL_BASENAME=$$(basename '$(MODEL_ARCHIVE)'); \
+	S3_ENDPOINT='http://$(RPC_HOST):$(S3_COMPAT_PORT)'; \
+	echo "MODEL_HASH=$$MODEL_HASH"; \
+	$(MAKE) start-local-s3-compatible; \
+	$(DOCKER) run --rm --network host \
+		-e MODEL_BASENAME="$$MODEL_BASENAME" \
+		-e MODEL_HASH="$$MODEL_HASH" \
+		-v "$$MODEL_DIR:/upload:ro" '$(MINIO_MC_IMAGE)' sh -ec '\
+		mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && \
+		mc cp "/upload/$${MODEL_BASENAME}" "local/$(S3_COMPAT_BUCKET)/$${MODEL_HASH}" >/dev/null'; \
+	echo "Uploaded $(MODEL_ARCHIVE) to local S3-compatible bucket $(S3_COMPAT_BUCKET) with key $$MODEL_HASH"; \
+	$(MAKE) -C '$(FL_ALLIANCE_CLIENT_DIR)' chain \
+		$(if $(strip $(CHAIN_DOCKER_COMPOSE)),DOCKER_COMPOSE='$(CHAIN_DOCKER_COMPOSE)') \
+		MODEL_DEFINITION_HASH="$$MODEL_HASH" \
+		$(if $(strip $(ROUNDS)),ROUNDS='$(ROUNDS)') \
+		$(if $(strip $(MIN_PARTICIPANTS)),MIN_PARTICIPANTS='$(MIN_PARTICIPANTS)') \
+		$(if $(strip $(TIME_TO_PROPOSE)),TIME_TO_PROPOSE='$(TIME_TO_PROPOSE)') \
+		$(if $(strip $(TIME_TO_VOTE)),TIME_TO_VOTE='$(TIME_TO_VOTE)'); \
+	TOKEN_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockToken']['address'])"); \
+	TASK_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockTask']['address'])"); \
+	echo "TOKEN_ADDRESS=$$TOKEN_ADDRESS"; \
+	echo "TASK_ADDRESS=$$TASK_ADDRESS"; \
+	$(MAKE) _deploy-local-chain-s3-compatible \
+		RPC='http://$(RPC_HOST):8545' \
+		TOKEN_ADDRESS="$$TOKEN_ADDRESS" \
+		TASK_ADDRESS="$$TASK_ADDRESS" \
+		S3_COMPAT_ENDPOINT_URL="$$S3_ENDPOINT" \
+		S3_COMPAT_BUCKET='$(S3_COMPAT_BUCKET)' \
+		S3_COMPAT_ACCESS_KEY='$(S3_COMPAT_ACCESS_KEY)' \
+		S3_COMPAT_SECRET_KEY='$(S3_COMPAT_SECRET_KEY)' \
+		S3_COMPAT_REGION='$(S3_COMPAT_REGION)' \
+		S3_COMPAT_ADDRESSING_STYLE='$(S3_COMPAT_ADDRESSING_STYLE)' \
+		S3_COMPAT_VERIFY_SSL='$(S3_COMPAT_VERIFY_SSL)'
+
 .PHONY: update-task
 update-task: ## Update shared task address only (usage: make update-task TASK_ADDRESS=0x...)
 ifndef TASK_ADDRESS
@@ -145,7 +313,7 @@ undeploy: ## Remove FLock addon release
 	$(HELM) uninstall $(RELEASE_NAME) || true
 
 .PHONY: deploy-auto-gpu
-deploy-auto-gpu: ## Deploy with auto-install for gpu=true clusters ([TASK_ADDRESS=0x...] [RPC=https://...] [TOKEN_ADDRESS=0x...])
+deploy-auto-gpu: ## Deploy with auto-install for gpu=true clusters ([TASK_ADDRESS=0x...] [TOKEN_ADDRESS=0x...])
 	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
 		--set addon.installStrategy=Placements \
 		--set placement.gpu.enabled=true \
@@ -154,7 +322,6 @@ deploy-auto-gpu: ## Deploy with auto-install for gpu=true clusters ([TASK_ADDRES
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
-		--set deploymentConfig.blockchain.rpc='$(RPC)' \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
@@ -168,7 +335,6 @@ deploy-auto-all: ## Deploy with dynamic auto-install: gpu=true clusters use GPU 
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
-		--set deploymentConfig.blockchain.rpc='$(RPC)' \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
