@@ -10,12 +10,11 @@ FLock addon deploys **FLockAlliance** to managed clusters as a direct client wor
 ## Documentation
 
 - [Install FLock Addon](docs/install-flock-addon.md)
-- [Auto-Install by Placement](docs/auto-install-by-placement.md)
 - [Troubleshooting](docs/troubleshooting.md)
 
 ## Primary Deployment Modes
 
-The main supported deployment modes are:
+The only supported deployment modes are:
 
 1. `make deploy-testnet`
    - testnet blockchain
@@ -32,9 +31,6 @@ The main supported deployment modes are:
    - Hub automatically starts local S3-compatible storage
    - Hub uploads `MODEL_ARCHIVE` into that object store using the archive SHA256 as the object key
    - Hub pushes the local-chain `BLOCKCHAIN_RPC`
-
-The older shared-filesystem local mode is still kept for compatibility, but it is
-now a legacy path rather than a primary mode.
 
 ## What Runs Where
 
@@ -102,14 +98,16 @@ Example:
 
 ```bash
 # [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' make deploy
+IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
+make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
 Or:
 
 ```bash
 # [Hub]
-FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:<git-sha-or-release-tag>' make deploy
+FLOCK_ALLIANCE_IMAGE='ghcr.io/ray-ruisun/fl-alliance-client:<git-sha-or-release-tag>' \
+make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
 ```
 
 Recommended explicit export form:
@@ -553,139 +551,6 @@ Should see:
 - Pod becomes `Running`
 - logs include the local-chain `TASK_ADDRESS`
 - logs do not show missing `BLOCKCHAIN_RPC` errors
-
-## Legacy: Local Chain + Shared Filesystem Mode
-
-Use local chain mode only if the blockchain endpoint is reachable from the addon Pod.
-
-Important:
-
-- do not use `127.0.0.1` unless the chain runs in the same Pod
-- prefer a node IP or Kubernetes Service DNS reachable from `flock-agent`
-- `storage.backend=local` requires a real shared filesystem for `/data/shared`
-- do not make the whole `/data/flock-client` directory shared across clusters, because `.env` is per-node and should keep a different `PRIVATE_KEY` on each managed cluster
-
-Recommended topology when the Hub hosts both Anvil and the shared storage:
-
-1. On the Hub or chain host, run `make chain MODEL_DEFINITION_HASH=<hash>` in `FL-Alliance-Client`.
-2. Export one shared directory from the Hub, for example `/srv/flock-shared`.
-3. On each managed cluster node:
-   - keep `/data/flock-client/.env` as a node-local file
-   - mount the Hub export at `/data/flock-client/shared`
-   - copy the Hub-generated `data/contracts.json` to `/data/flock-client/contracts.json`, or pass `TOKEN_ADDRESS` and `TASK_ADDRESS` from the Hub deploy command
-
-If you want the Hub to start the local chain as part of addon deployment, use the
-new one-command wrapper:
-
-```bash
-# [Hub]
-make deploy-local-stack \
-  FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client \
-  MODEL_ARCHIVE=/path/to/model.tar.gz \
-  RPC_HOST=<hub-ip> \
-  HUB_SHARED_MODELS_DIR=/srv/flock-shared/models
-```
-
-What this wrapper does:
-
-- computes `MODEL_HASH` from `MODEL_ARCHIVE`
-- optionally copies the archive into `HUB_SHARED_MODELS_DIR/<MODEL_HASH>`
-- runs `make chain` in `FL-Alliance-Client` on the Hub
-- reads `TOKEN_ADDRESS` and `TASK_ADDRESS` from `data/contracts.json`
-- deploys `flock-addon` in local mode with those addresses
-
-When you use this wrapper, managed nodes do not need a local `contracts.json`
-copy because the Hub passes the contract addresses directly.
-
-What it does not do:
-
-- it does not mount NFS/SMB on the managed nodes
-- it does not create `/data/flock-client/.env` on each managed node
-
-Example node layout on every managed cluster node:
-
-```text
-/data/flock-client/
-├── .env                 # node-local, different PRIVATE_KEY per cluster
-├── contracts.json       # copied from Hub make chain output, optional if Hub passes addresses
-└── shared/              # shared filesystem mount from the Hub
-    ├── models/<hash>
-    └── params/<task-address>/
-```
-
-Example node `.env`:
-
-```dotenv
-PRIVATE_KEY=0x...
-HF_TOKEN=hf_...
-BLOCKCHAIN_RPC=http://<hub-ip-or-service>:8545
-```
-
-On the Hub, place the model archive into the shared storage before enabling the addon:
-
-```bash
-# [Hub or chain host]
-mkdir -p /srv/flock-shared/models
-cp model.tar.gz /srv/flock-shared/models/<MODEL_HASH>
-```
-
-If you are not passing contract addresses from the Hub, also copy the generated contract
-metadata to each managed node as `/data/flock-client/contracts.json`:
-
-```bash
-# [Hub or chain host]
-scp ./data/contracts.json \
-  ubuntu@<managed-node>:/data/flock-client/contracts.json
-```
-
-Deploy command:
-
-```bash
-# [Hub]
-make deploy-local-chain RPC='http://<hub-ip-or-service>:8545'
-```
-
-If you want the Hub to push the contract addresses directly instead of copying
-`contracts.json` to every managed node:
-
-```bash
-# [Hub]
-make deploy-local-chain \
-  RPC='http://<hub-ip-or-service>:8545' \
-  TOKEN_ADDRESS='0x<token-address>' \
-  TASK_ADDRESS='0x<task-address>'
-```
-
-Check:
-
-```bash
-# [Hub]
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "BLOCKCHAIN_RPC|TOKEN_ADDRESS|TASK_ADDRESS|STORAGE_BACKEND|LOCAL_STORAGE_DIR|value"
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "http://<hub-ip-or-service>:8545|local|/data/shared"
-```
-
-Should see:
-
-- `BLOCKCHAIN_RPC` points to the Hub-hosted chain
-- `STORAGE_BACKEND` is `local`
-- `LOCAL_STORAGE_DIR` is `/data/shared`
-- `TOKEN_ADDRESS` / `TASK_ADDRESS` are present only if you passed them from the Hub
-
-Managed node checks:
-
-```bash
-# [Each Managed Cluster Node]
-findmnt /data/flock-client/shared || mount | rg '/data/flock-client/shared'
-ls -l /data/flock-client/.env /data/flock-client/contracts.json
-ls -l /data/flock-client/shared/models
-```
-
-Should see:
-
-- `/data/flock-client/shared` is a mounted shared filesystem, not just an empty local directory
-- `.env` exists locally on each node
-- `contracts.json` exists if you are not pushing contract addresses from the Hub
-- the model archive exists under `shared/models/<MODEL_HASH>`
 
 ## Local Chain + Local S3-Compatible Storage Mode
 
@@ -1167,60 +1032,6 @@ spec:
       namespace: open-cluster-management
 ```
 
-## Placement Auto-Install
-
-Use placement mode only if you want the addon to be installed automatically based on cluster labels or clustersets.
-`deploy-auto-gpu` and `deploy-auto-all` use the same image variables as `deploy`/`deploy-testnet`
-(`IMAGE_OWNER`, `IMAGE_TAG`, `FLOCK_ALLIANCE_IMAGE`, `IMAGE_PULL_SECRET`) and also accept optional
-`TASK_ADDRESS`, `RPC`, and `TOKEN_ADDRESS`.
-
-### GPU placement
-
-```bash
-# [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
-TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924' make deploy-auto-gpu
-kubectl label managedcluster cluster1 gpu=true
-```
-
-Check:
-
-```bash
-# [Hub]
-kubectl -n open-cluster-management get placement flock-addon-gpu-placement -o yaml
-kubectl -n cluster1 get managedclusteraddon flock-addon
-```
-
-Should see:
-
-- the placement exists
-- a labeled cluster eventually gets `managedclusteraddon/flock-addon`
-
-### All-cluster placement
-
-```bash
-# [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' \
-TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924' make deploy-auto-all
-```
-
-`deploy-auto-all` is dynamic by default. It creates one placement for
-`gpu=true` clusters and one fallback placement for the rest, so GPU-capable
-clusters get the GPU template while non-GPU clusters stay on CPU.
-
-Check:
-
-```bash
-# [Hub]
-kubectl -n open-cluster-management get placement flock-addon-all-placement -o yaml
-kubectl -n cluster1 get managedclusteraddon flock-addon
-```
-
-Should see:
-
-- the placement exists
-- selected clusters eventually get `managedclusteraddon/flock-addon`
-
 ## Direct CLI Mapping
 
 Old direct run:
@@ -1270,4 +1081,3 @@ Should see:
 
 - Use [Install FLock Addon](docs/install-flock-addon.md) for a clean first deployment
 - Use [Troubleshooting](docs/troubleshooting.md) if the addon reaches Hub but not the managed cluster
-- Use [Auto-Install by Placement](docs/auto-install-by-placement.md) only when you want automatic cluster selection

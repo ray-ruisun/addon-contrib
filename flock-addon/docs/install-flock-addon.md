@@ -4,7 +4,7 @@ This guide installs the FLock addon on Open Cluster Management (OCM) and deploys
 
 ## Primary Deployment Modes
 
-The main supported deployment modes are:
+The only supported deployment modes are:
 
 1. `make deploy-testnet`
    - testnet blockchain
@@ -20,8 +20,6 @@ The main supported deployment modes are:
    - Hub automatically starts local S3-compatible storage
    - Hub uploads `MODEL_ARCHIVE` into object storage using the SHA256 as the object key
    - Hub pushes the local-chain `BLOCKCHAIN_RPC`
-
-The older shared-filesystem local mode remains available as a legacy path.
 
 ## What Gets Deployed
 
@@ -451,103 +449,6 @@ Should see:
 - Pod becomes `Running`
 - logs include the local-chain `TASK_ADDRESS`
 - logs do not show missing `BLOCKCHAIN_RPC` errors
-
-## Legacy: Local Chain + Shared Filesystem Mode
-
-Use local chain mode only if the blockchain endpoint is reachable from the addon Pod.
-
-Important:
-
-- do not use `127.0.0.1` unless the chain runs in the same Pod
-- prefer a node IP or Kubernetes Service DNS reachable from `flock-agent`
-- `storage.backend=local` requires a real shared filesystem for `/data/shared`
-- do not make the whole `/data/flock-client` directory shared across clusters, because `.env` is per-node and should keep a different `PRIVATE_KEY` on each managed cluster
-
-Recommended topology when the Hub hosts both Anvil and the shared storage:
-
-1. On the Hub or chain host, run `make chain MODEL_DEFINITION_HASH=<hash>` in `FL-Alliance-Client`.
-2. Export one shared directory from the Hub, for example `/srv/flock-shared`.
-3. On each managed cluster node:
-   - keep `/data/flock-client/.env` as a node-local file
-   - mount the Hub export at `/data/flock-client/shared`
-   - copy the Hub-generated `data/contracts.json` to `/data/flock-client/contracts.json`, or pass `TOKEN_ADDRESS` and `TASK_ADDRESS` from the Hub deploy command
-
-If you want the Hub to start the local chain as part of addon deployment, use the
-one-command wrapper:
-
-```bash
-# [Hub]
-make deploy-local-stack \
-  FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client \
-  MODEL_ARCHIVE=/path/to/model.tar.gz \
-  RPC_HOST=<hub-ip> \
-  HUB_SHARED_MODELS_DIR=/srv/flock-shared/models
-```
-
-This wrapper starts `make chain` in `FL-Alliance-Client`, reads the deployed
-contract addresses, and then deploys `flock-addon` in local mode. It still does
-not mount NFS/SMB for you on the managed nodes, and it does not create each
-node's `.env` automatically.
-
-When you use this wrapper, managed nodes do not need a local `contracts.json`
-copy because the Hub passes the contract addresses directly.
-
-Example node `.env`:
-
-```dotenv
-PRIVATE_KEY=0x...
-HF_TOKEN=hf_...
-BLOCKCHAIN_RPC=http://<hub-ip-or-service>:8545
-```
-
-Place the model archive into the shared storage before enabling the addon:
-
-```bash
-# [Hub or chain host]
-mkdir -p /srv/flock-shared/models
-cp model.tar.gz /srv/flock-shared/models/<MODEL_HASH>
-```
-
-If you are not passing contract addresses from the Hub, also copy the generated contract
-metadata to each managed node as `/data/flock-client/contracts.json`:
-
-```bash
-# [Hub or chain host]
-scp ./data/contracts.json \
-  ubuntu@<managed-node>:/data/flock-client/contracts.json
-```
-
-Deploy:
-
-```bash
-# [Hub]
-make deploy-local-chain RPC='http://<hub-ip-or-service>:8545'
-```
-
-If you want the Hub to push the contract addresses directly instead of copying
-`contracts.json` to every managed node:
-
-```bash
-# [Hub]
-make deploy-local-chain \
-  RPC='http://<hub-ip-or-service>:8545' \
-  TOKEN_ADDRESS='0x<token-address>' \
-  TASK_ADDRESS='0x<task-address>'
-```
-
-Check:
-
-```bash
-# [Hub]
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "BLOCKCHAIN_RPC|TOKEN_ADDRESS|TASK_ADDRESS|STORAGE_BACKEND|LOCAL_STORAGE_DIR|value"
-```
-
-Should see:
-
-- `BLOCKCHAIN_RPC` points to the Hub-hosted chain
-- `STORAGE_BACKEND` is `local`
-- `LOCAL_STORAGE_DIR` is `/data/shared`
-- `TOKEN_ADDRESS` / `TASK_ADDRESS` are present only if you passed them from the Hub
 
 ## Local Chain + Local S3-Compatible Storage Mode
 

@@ -12,13 +12,10 @@ IMAGE_TAG ?= latest
 IMAGE_PULL_POLICY ?= Always
 FLOCK_ALLIANCE_IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_OWNER)/$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_PULL_SECRET ?=
-HOST_DATA_PATH ?= /data/flock-client
-LOCAL_STORAGE_DIR ?= /data/shared
 FL_ALLIANCE_CLIENT_DIR ?=
 MODEL_ARCHIVE ?=
 MODEL_HASH ?=
 RPC_HOST ?=
-HUB_SHARED_MODELS_DIR ?=
 CHAIN_DOCKER_COMPOSE ?= $(DOCKER) compose
 MINIO_IMAGE ?= quay.io/minio/minio
 MINIO_MC_IMAGE ?= quay.io/minio/mc
@@ -45,27 +42,6 @@ endif
 all: help
 
 ##@ Deployment
-
-.PHONY: deploy
-deploy: ## Deploy FLock addon via Helm
-	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
-		--set addon.installStrategy=Manual \
-		--set placement.gpu.enabled=false \
-		--set placement.all.enabled=false \
-		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
-		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
-		$(IMAGE_PULL_SECRET_ARG)
-
-.PHONY: upgrade
-upgrade: ## Upgrade FLock addon with current image/runtime values
-	$(HELM) upgrade $(RELEASE_NAME) $(CHART_PATH) \
-		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
-		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
-		$(IMAGE_PULL_SECRET_ARG) \
-		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
-		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
 .PHONY: deploy-testnet
 deploy-testnet: ## Deploy for testnet mode (usage: make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...])
@@ -140,65 +116,6 @@ endif
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
 		--set deploymentConfig.storage.backend='s3'
-
-.PHONY: deploy-local-chain
-deploy-local-chain:
-ifndef RPC
-	$(error RPC is not set. Usage: make deploy-local-chain RPC=http://<hub-ip>:8545 [TOKEN_ADDRESS=0x...] [TASK_ADDRESS=0x...])
-endif
-	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
-		--set addon.installStrategy=Manual \
-		--set placement.gpu.enabled=false \
-		--set placement.all.enabled=false \
-		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
-		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
-		$(IMAGE_PULL_SECRET_ARG) \
-		--set agent.dataVolume.hostPath='$(HOST_DATA_PATH)' \
-		--set deploymentConfig.blockchain.rpc='$(RPC)' \
-		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
-		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
-		--set deploymentConfig.training.noIncentive='false' \
-		--set deploymentConfig.storage.backend='local' \
-		--set deploymentConfig.storage.localSharedDir='$(LOCAL_STORAGE_DIR)'
-
-.PHONY: deploy-local-stack
-deploy-local-stack:
-ifndef FL_ALLIANCE_CLIENT_DIR
-	$(error FL_ALLIANCE_CLIENT_DIR is not set. Usage: make deploy-local-stack FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
-endif
-ifndef MODEL_ARCHIVE
-	$(error MODEL_ARCHIVE is not set. Usage: make deploy-local-stack FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
-endif
-ifndef RPC_HOST
-	$(error RPC_HOST is not set. Usage: make deploy-local-stack FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
-endif
-	@set -e; \
-	MODEL_HASH=$$(sha256sum '$(MODEL_ARCHIVE)' | cut -d' ' -f1); \
-	echo "MODEL_HASH=$$MODEL_HASH"; \
-	if [ -n "$(HUB_SHARED_MODELS_DIR)" ]; then \
-		mkdir -p '$(HUB_SHARED_MODELS_DIR)'; \
-		cp '$(MODEL_ARCHIVE)' '$(HUB_SHARED_MODELS_DIR)'/"$$MODEL_HASH"; \
-		echo "Copied model archive to $(HUB_SHARED_MODELS_DIR)/$$MODEL_HASH"; \
-	else \
-		echo "HUB_SHARED_MODELS_DIR is empty; skipping model archive copy."; \
-		echo "Make sure the shared storage already contains models/$$MODEL_HASH before enabling the addon."; \
-	fi; \
-	$(MAKE) -C '$(FL_ALLIANCE_CLIENT_DIR)' chain \
-		$(if $(strip $(CHAIN_DOCKER_COMPOSE)),DOCKER_COMPOSE='$(CHAIN_DOCKER_COMPOSE)') \
-		MODEL_DEFINITION_HASH="$$MODEL_HASH" \
-		$(if $(strip $(ROUNDS)),ROUNDS='$(ROUNDS)') \
-		$(if $(strip $(MIN_PARTICIPANTS)),MIN_PARTICIPANTS='$(MIN_PARTICIPANTS)') \
-		$(if $(strip $(TIME_TO_PROPOSE)),TIME_TO_PROPOSE='$(TIME_TO_PROPOSE)') \
-		$(if $(strip $(TIME_TO_VOTE)),TIME_TO_VOTE='$(TIME_TO_VOTE)'); \
-	TOKEN_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockToken']['address'])"); \
-	TASK_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockTask']['address'])"); \
-	echo "TOKEN_ADDRESS=$$TOKEN_ADDRESS"; \
-	echo "TASK_ADDRESS=$$TASK_ADDRESS"; \
-	$(MAKE) deploy-local-chain \
-		RPC='http://$(RPC_HOST):8545' \
-		TOKEN_ADDRESS="$$TOKEN_ADDRESS" \
-		TASK_ADDRESS="$$TASK_ADDRESS"
 
 .PHONY: start-local-s3-compatible
 start-local-s3-compatible:
@@ -311,32 +228,6 @@ endif
 .PHONY: undeploy
 undeploy: ## Remove FLock addon release
 	$(HELM) uninstall $(RELEASE_NAME) || true
-
-.PHONY: deploy-auto-gpu
-deploy-auto-gpu: ## Deploy with auto-install for gpu=true clusters ([TASK_ADDRESS=0x...] [TOKEN_ADDRESS=0x...])
-	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
-		--set addon.installStrategy=Placements \
-		--set placement.gpu.enabled=true \
-		--set placement.all.enabled=false \
-		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
-		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
-		$(IMAGE_PULL_SECRET_ARG) \
-		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
-		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
-
-.PHONY: deploy-auto-all
-deploy-auto-all: ## Deploy with dynamic auto-install: gpu=true clusters use GPU template, others use CPU template
-	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
-		--set addon.installStrategy=Placements \
-		--set placement.gpu.enabled=true \
-		--set placement.all.enabled=true \
-		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
-		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
-		$(IMAGE_PULL_SECRET_ARG) \
-		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
-		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
 .PHONY: enable-addon
 enable-addon: ## Enable addon on a cluster; auto-select gpu/cpu template from managedcluster label gpu=true (override with CONFIG=/TEMPLATE=)
