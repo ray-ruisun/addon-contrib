@@ -395,6 +395,13 @@ make deploy-local-chain-s3 \
 If Docker on the Hub requires `sudo`, run the same command with
 `DOCKER='sudo docker'`.
 
+Important:
+
+- wait for the command to finish by itself
+- do not press `Ctrl+C` while `make chain` is still deploying contracts
+- `anvil` is started in the background, but the Hub still waits for the one-shot `deployer` step to finish
+- if you interrupt this step early, `data/contracts.json` may be missing or incomplete, and `TOKEN_ADDRESS` / `TASK_ADDRESS` will not be pushed to the addon
+
 What it does:
 
 - runs `make chain` in `FL-Alliance-Client`
@@ -517,6 +524,13 @@ make deploy-local-chain-s3-compatible \
 
 If Docker on the Hub requires `sudo`, run the same command with
 `DOCKER='sudo docker'`.
+
+Important:
+
+- wait for the command to finish by itself
+- do not press `Ctrl+C` while `make chain` is still deploying contracts
+- this mode also waits for the local MinIO upload and the one-shot `deployer` step before Helm deploy starts
+- if you interrupt this step early, `data/contracts.json` may be missing or incomplete, and the addon will not get valid `TOKEN_ADDRESS` / `TASK_ADDRESS`
 
 Check:
 
