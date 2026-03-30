@@ -16,7 +16,7 @@ FL_ALLIANCE_CLIENT_DIR ?=
 MODEL_ARCHIVE ?=
 MODEL_HASH ?=
 RPC_HOST ?=
-CHAIN_DOCKER_COMPOSE ?= $(DOCKER) compose
+CHAIN_DOCKER_COMPOSE ?= $(if $(filter sudo,$(word 1,$(DOCKER))),sudo -E $(wordlist 2,$(words $(DOCKER)),$(DOCKER)) compose,$(DOCKER) compose)
 MINIO_IMAGE ?= quay.io/minio/minio
 MINIO_MC_IMAGE ?= quay.io/minio/mc
 S3_COMPAT_CONTAINER_NAME ?= flock-minio
@@ -161,6 +161,10 @@ endif
 		$(if $(strip $(TIME_TO_VOTE)),TIME_TO_VOTE='$(TIME_TO_VOTE)'); \
 	TOKEN_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockToken']['address'])"); \
 	TASK_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockTask']['address'])"); \
+	if [ -z "$$TOKEN_ADDRESS" ] || [ -z "$$TASK_ADDRESS" ]; then \
+		echo "ERROR: FL-Alliance-Client chain deployment did not produce TOKEN_ADDRESS/TASK_ADDRESS"; \
+		exit 1; \
+	fi; \
 	echo "TOKEN_ADDRESS=$$TOKEN_ADDRESS"; \
 	echo "TASK_ADDRESS=$$TASK_ADDRESS"; \
 	$(MAKE) _deploy-local-chain-s3 \
@@ -202,6 +206,10 @@ endif
 		$(if $(strip $(TIME_TO_VOTE)),TIME_TO_VOTE='$(TIME_TO_VOTE)'); \
 	TOKEN_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockToken']['address'])"); \
 	TASK_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockTask']['address'])"); \
+	if [ -z "$$TOKEN_ADDRESS" ] || [ -z "$$TASK_ADDRESS" ]; then \
+		echo "ERROR: FL-Alliance-Client chain deployment did not produce TOKEN_ADDRESS/TASK_ADDRESS"; \
+		exit 1; \
+	fi; \
 	echo "TOKEN_ADDRESS=$$TOKEN_ADDRESS"; \
 	echo "TASK_ADDRESS=$$TASK_ADDRESS"; \
 	$(MAKE) _deploy-local-chain-s3-compatible \
