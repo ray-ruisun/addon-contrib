@@ -413,39 +413,130 @@ Important:
 
 - do not use `127.0.0.1` unless the chain runs in the same Pod
 - prefer a node IP or Kubernetes Service DNS reachable from `flock-agent`
+- `storage.backend=local` requires a real shared filesystem for `/data/shared`
+- do not make the whole `/data/flock-client` directory shared across clusters, because `.env` is per-node and should keep a different `PRIVATE_KEY` on each managed cluster
 
-Example `.env`:
+Recommended topology when the Hub hosts both Anvil and the shared storage:
+
+1. On the Hub or chain host, run `make chain MODEL_DEFINITION_HASH=<hash>` in `FL-Alliance-Client`.
+2. Export one shared directory from the Hub, for example `/srv/flock-shared`.
+3. On each managed cluster node:
+   - keep `/data/flock-client/.env` as a node-local file
+   - mount the Hub export at `/data/flock-client/shared`
+   - copy the Hub-generated `data/contracts.json` to `/data/flock-client/contracts.json`, or pass `TOKEN_ADDRESS` and `TASK_ADDRESS` from the Hub deploy command
+
+If you want the Hub to start the local chain as part of addon deployment, use the
+new one-command wrapper:
+
+```bash
+# [Hub]
+make deploy-local-stack \
+  FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client \
+  MODEL_ARCHIVE=/path/to/model.tar.gz \
+  RPC_HOST=<hub-ip> \
+  HUB_SHARED_MODELS_DIR=/srv/flock-shared/models
+```
+
+What this wrapper does:
+
+- computes `MODEL_HASH` from `MODEL_ARCHIVE`
+- optionally copies the archive into `HUB_SHARED_MODELS_DIR/<MODEL_HASH>`
+- runs `make chain` in `FL-Alliance-Client` on the Hub
+- reads `TOKEN_ADDRESS` and `TASK_ADDRESS` from `data/contracts.json`
+- deploys `flock-addon` in local mode with those addresses
+
+When you use this wrapper, managed nodes do not need a local `contracts.json`
+copy because the Hub passes the contract addresses directly.
+
+What it does not do:
+
+- it does not mount NFS/SMB on the managed nodes
+- it does not create `/data/flock-client/.env` on each managed node
+
+Example node layout on every managed cluster node:
+
+```text
+/data/flock-client/
+├── .env                 # node-local, different PRIVATE_KEY per cluster
+├── contracts.json       # copied from Hub make chain output, optional if Hub passes addresses
+└── shared/              # shared filesystem mount from the Hub
+    ├── models/<hash>
+    └── params/<task-address>/
+```
+
+Example node `.env`:
 
 ```dotenv
 PRIVATE_KEY=0x...
 HF_TOKEN=hf_...
-BLOCKCHAIN_RPC=http://<node-ip-or-service>:8545
-TOKEN_ADDRESS=0x...
-TASK_ADDRESS=0x...
-LOCAL_STORAGE_DIR=/data/shared
+BLOCKCHAIN_RPC=http://<hub-ip-or-service>:8545
+```
+
+On the Hub, place the model archive into the shared storage before enabling the addon:
+
+```bash
+# [Hub or chain host]
+mkdir -p /srv/flock-shared/models
+cp model.tar.gz /srv/flock-shared/models/<MODEL_HASH>
+```
+
+If you are not passing contract addresses from the Hub, also copy the generated contract
+metadata to each managed node as `/data/flock-client/contracts.json`:
+
+```bash
+# [Hub or chain host]
+scp ./data/contracts.json \
+  ubuntu@<managed-node>:/data/flock-client/contracts.json
 ```
 
 Deploy command:
 
 ```bash
 # [Hub]
-helm upgrade --install flock-addon charts/flock-addon \
-  --set agent.dataVolume.hostPath='/data/flock-client' \
-  --set deploymentConfig.storage.backend='local' \
-  --set deploymentConfig.storage.localSharedDir='/data/shared'
+make deploy-local-chain RPC='http://<hub-ip-or-service>:8545'
+```
+
+If you want the Hub to push the contract addresses directly instead of copying
+`contracts.json` to every managed node:
+
+```bash
+# [Hub]
+make deploy-local-chain \
+  RPC='http://<hub-ip-or-service>:8545' \
+  TOKEN_ADDRESS='0x<token-address>' \
+  TASK_ADDRESS='0x<task-address>'
 ```
 
 Check:
 
 ```bash
 # [Hub]
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "STORAGE_BACKEND|LOCAL_STORAGE_DIR|value"
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "BLOCKCHAIN_RPC|TOKEN_ADDRESS|TASK_ADDRESS|STORAGE_BACKEND|LOCAL_STORAGE_DIR|value"
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "http://<hub-ip-or-service>:8545|local|/data/shared"
 ```
 
 Should see:
 
+- `BLOCKCHAIN_RPC` points to the Hub-hosted chain
 - `STORAGE_BACKEND` is `local`
 - `LOCAL_STORAGE_DIR` is `/data/shared`
+- `TOKEN_ADDRESS` / `TASK_ADDRESS` are present only if you passed them from the Hub
+
+Managed node checks:
+
+```bash
+# [Each Managed Cluster Node]
+findmnt /data/flock-client/shared || mount | rg '/data/flock-client/shared'
+ls -l /data/flock-client/.env /data/flock-client/contracts.json
+ls -l /data/flock-client/shared/models
+```
+
+Should see:
+
+- `/data/flock-client/shared` is a mounted shared filesystem, not just an empty local directory
+- `.env` exists locally on each node
+- `contracts.json` exists if you are not pushing contract addresses from the Hub
+- the model archive exists under `shared/models/<MODEL_HASH>`
 
 ## Update Task Address
 
@@ -762,8 +853,9 @@ Parameter flow is:
 3. OCM injects `customizedVariables` into the template placeholders.
 4. The Pod gets env vars such as `TASK_ADDRESS`, `USE_GPU`, and `HOST_DATA_PATH`.
 5. The container entrypoint loads `.env` from `FLOCK_ALLIANCE_ENV_FILE`; `TASK_ADDRESS`, `USE_GPU`, `STORAGE_BACKEND`, and `NO_INCENTIVE` stay authoritative from OCM.
-6. `NUM_PARTICIPANTS` is restored from OCM only when `STORAGE_BACKEND=local`; testnet/S3 mode does not force it.
-7. The entrypoint appends CLI `--override` values before starting `FLockAlliance`.
+6. When `STORAGE_BACKEND=local`, `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`, and `LOCAL_STORAGE_DIR` also stay authoritative from OCM when non-empty.
+7. `NUM_PARTICIPANTS` is restored from OCM only when `STORAGE_BACKEND=local`; testnet/S3 mode does not force it.
+8. The entrypoint appends CLI `--override` values before starting `FLockAlliance`.
 
 Example `AddOnDeploymentConfig`:
 

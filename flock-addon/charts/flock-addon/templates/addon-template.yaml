@@ -110,7 +110,10 @@ spec:
                         # The mounted .env file still provides per-node secrets and
                         # local connection details, but should not override the shared
                         # deployment mode selected on the Hub.
+                        OCM_BLOCKCHAIN_RPC="${BLOCKCHAIN_RPC:-}"
+                        OCM_TOKEN_ADDRESS="${TOKEN_ADDRESS:-}"
                         OCM_TASK_ADDRESS="${TASK_ADDRESS:-}"
+                        OCM_LOCAL_STORAGE_DIR="${LOCAL_STORAGE_DIR:-}"
                         OCM_USE_GPU="${USE_GPU:-}"
                         OCM_STORAGE_BACKEND="${STORAGE_BACKEND:-}"
                         OCM_NO_INCENTIVE="${NO_INCENTIVE:-}"
@@ -126,6 +129,15 @@ spec:
                         if [ -n "${OCM_USE_GPU:-}" ]; then export USE_GPU="${OCM_USE_GPU}"; fi
                         if [ -n "${OCM_STORAGE_BACKEND:-}" ]; then export STORAGE_BACKEND="${OCM_STORAGE_BACKEND}"; fi
                         if [ -n "${OCM_NO_INCENTIVE:-}" ]; then export NO_INCENTIVE="${OCM_NO_INCENTIVE}"; fi
+                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_BLOCKCHAIN_RPC:-}" ]; then
+                          export BLOCKCHAIN_RPC="${OCM_BLOCKCHAIN_RPC}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_TOKEN_ADDRESS:-}" ]; then
+                          export TOKEN_ADDRESS="${OCM_TOKEN_ADDRESS}"
+                        fi
+                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_LOCAL_STORAGE_DIR:-}" ]; then
+                          export LOCAL_STORAGE_DIR="${OCM_LOCAL_STORAGE_DIR}"
+                        fi
                         if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_NUM_PARTICIPANTS:-}" ]; then
                           export NUM_PARTICIPANTS="${OCM_NUM_PARTICIPANTS}"
                         fi
