@@ -26,6 +26,7 @@ The main supported deployment modes are:
    - Hub automatically runs `make chain`
    - original signer-based `s3` storage backend
    - Hub pushes the local-chain `BLOCKCHAIN_RPC`
+   - you upload the model archive first and pass the existing `MODEL_HASH` to the Hub deploy command
 3. `make deploy-local-chain-s3-compatible`
    - Hub automatically runs `make chain`
    - Hub automatically starts local S3-compatible storage
@@ -474,6 +475,16 @@ Use this mode when:
 - the Hub should auto-start the local chain
 - storage should still use the original signer-based `s3` backend
 - the Hub should push the local-chain `BLOCKCHAIN_RPC`
+- you already uploaded `model.tar.gz` to the original/public S3 bucket and have the matching `MODEL_HASH`
+
+Prepare the uploaded model first, for example:
+
+```bash
+# [FLocKit workspace]
+python scripts/build_and_upload_s3.py --storage s3
+```
+
+That command prints the SHA256 hash. Use that value as `MODEL_HASH` below.
 
 Deploy:
 
@@ -481,13 +492,12 @@ Deploy:
 # [Hub]
 make deploy-local-chain-s3 \
   FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client \
-  MODEL_ARCHIVE=/path/to/model.tar.gz \
+  MODEL_HASH=<sha256> \
   RPC_HOST=<hub-ip>
 ```
 
 What it does:
 
-- computes `MODEL_HASH` from `MODEL_ARCHIVE`
 - runs `make chain` in `FL-Alliance-Client`
 - reads `TOKEN_ADDRESS` and `TASK_ADDRESS` from `data/contracts.json`
 - deploys `storage.backend=s3`
@@ -521,6 +531,7 @@ Should see:
 - `STORAGE_BACKEND` is `s3`
 - `BLOCKCHAIN_RPC` points to `http://<hub-ip>:8545`
 - `TASK_ADDRESS` matches the Hub-generated value
+- the deployed task was created from the `MODEL_HASH` you passed to `make chain`
 
 After enabling the addon on a managed cluster, verify runtime:
 

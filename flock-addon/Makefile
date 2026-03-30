@@ -16,6 +16,7 @@ HOST_DATA_PATH ?= /data/flock-client
 LOCAL_STORAGE_DIR ?= /data/shared
 FL_ALLIANCE_CLIENT_DIR ?=
 MODEL_ARCHIVE ?=
+MODEL_HASH ?=
 RPC_HOST ?=
 HUB_SHARED_MODELS_DIR ?=
 CHAIN_DOCKER_COMPOSE ?=
@@ -222,22 +223,21 @@ start-local-s3-compatible:
 	echo "Ensured bucket $(S3_COMPAT_BUCKET) exists"
 
 .PHONY: deploy-local-chain-s3
-deploy-local-chain-s3: ## Auto-start local chain on the Hub, read contract addresses, then deploy addon with original signer-based S3 storage
+deploy-local-chain-s3: ## Use an existing uploaded MODEL_HASH, auto-start local chain on the Hub, then deploy addon with original signer-based S3 storage
 ifndef FL_ALLIANCE_CLIENT_DIR
-	$(error FL_ALLIANCE_CLIENT_DIR is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
+	$(error FL_ALLIANCE_CLIENT_DIR is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_HASH=<sha256> RPC_HOST=<hub-ip>)
 endif
-ifndef MODEL_ARCHIVE
-	$(error MODEL_ARCHIVE is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
+ifndef MODEL_HASH
+	$(error MODEL_HASH is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_HASH=<sha256> RPC_HOST=<hub-ip>)
 endif
 ifndef RPC_HOST
-	$(error RPC_HOST is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
+	$(error RPC_HOST is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_HASH=<sha256> RPC_HOST=<hub-ip>)
 endif
 	@set -e; \
-	MODEL_HASH=$$(sha256sum '$(MODEL_ARCHIVE)' | cut -d' ' -f1); \
-	echo "MODEL_HASH=$$MODEL_HASH"; \
+	echo "MODEL_HASH=$(MODEL_HASH)"; \
 	$(MAKE) -C '$(FL_ALLIANCE_CLIENT_DIR)' chain \
 		$(if $(strip $(CHAIN_DOCKER_COMPOSE)),DOCKER_COMPOSE='$(CHAIN_DOCKER_COMPOSE)') \
-		MODEL_DEFINITION_HASH="$$MODEL_HASH" \
+		MODEL_DEFINITION_HASH='$(MODEL_HASH)' \
 		$(if $(strip $(ROUNDS)),ROUNDS='$(ROUNDS)') \
 		$(if $(strip $(MIN_PARTICIPANTS)),MIN_PARTICIPANTS='$(MIN_PARTICIPANTS)') \
 		$(if $(strip $(TIME_TO_PROPOSE)),TIME_TO_PROPOSE='$(TIME_TO_PROPOSE)') \
