@@ -394,6 +394,9 @@ make deploy-local-chain-s3 \
   RPC_HOST=<hub-ip>
 ```
 
+If Docker on the Hub requires `sudo`, run the same command with
+`DOCKER='sudo docker'`.
+
 What it does:
 
 - runs `make chain` in `FL-Alliance-Client`
@@ -610,6 +613,9 @@ make deploy-local-chain-s3-compatible \
   MODEL_ARCHIVE=/path/to/model.tar.gz \
   RPC_HOST=<hub-ip>
 ```
+
+If Docker on the Hub requires `sudo`, run the same command with
+`DOCKER='sudo docker'`.
 
 Check:
 
