@@ -134,7 +134,7 @@ start-local-s3-compatible:
 		'$(MINIO_IMAGE)' server /data --console-address ":9001" >/dev/null; \
 	echo "Started local S3-compatible storage at http://127.0.0.1:$(S3_COMPAT_PORT)"; \
 	sleep 3; \
-	$(DOCKER) run --rm --network host '$(MINIO_MC_IMAGE)' sh -ec '\
+	$(DOCKER) run --rm --network host --entrypoint /bin/sh '$(MINIO_MC_IMAGE)' -ec '\
 		mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && \
 		mc mb --ignore-existing local/$(S3_COMPAT_BUCKET) >/dev/null'; \
 	echo "Ensured bucket $(S3_COMPAT_BUCKET) exists"
@@ -190,10 +190,10 @@ endif
 	S3_ENDPOINT='http://$(RPC_HOST):$(S3_COMPAT_PORT)'; \
 	echo "MODEL_HASH=$$MODEL_HASH"; \
 	$(MAKE) start-local-s3-compatible; \
-	$(DOCKER) run --rm --network host \
+	$(DOCKER) run --rm --network host --entrypoint /bin/sh \
 		-e MODEL_BASENAME="$$MODEL_BASENAME" \
 		-e MODEL_HASH="$$MODEL_HASH" \
-		-v "$$MODEL_DIR:/upload:ro" '$(MINIO_MC_IMAGE)' sh -ec '\
+		-v "$$MODEL_DIR:/upload:ro" '$(MINIO_MC_IMAGE)' -ec '\
 		mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && \
 		mc cp "/upload/$${MODEL_BASENAME}" "local/$(S3_COMPAT_BUCKET)/$${MODEL_HASH}" >/dev/null'; \
 	echo "Uploaded $(MODEL_ARCHIVE) to local S3-compatible bucket $(S3_COMPAT_BUCKET) with key $$MODEL_HASH"; \
