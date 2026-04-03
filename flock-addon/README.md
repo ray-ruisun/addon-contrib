@@ -73,5 +73,6 @@ Full mode details are in [Deployment Modes](docs/deployment-modes.md).
 
 ## Related Projects
 
-- [FLockAlliance](https://github.com/FLock-io/FL-Alliance-Client) - the direct client runtime deployed by this addon
+- [FLock FL Alliance Client](https://github.com/FLock-io/FL-Alliance-Client) - the direct client runtime deployed by this addon
+- [FLock FLockit](https://github.com/FLock-io/FLocKit) - the federated learning training logic template.
 - [Open Cluster Management](https://open-cluster-management.io) - multi-cluster management for Kubernetes
