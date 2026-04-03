@@ -41,24 +41,24 @@ Full mode details are in [Deployment Modes](docs/deployment-modes.md).
 ┌─────────────────────────────────────────────────────────────┐
 │                        Hub Cluster                          │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │  ClusterManagementAddOn + AddOnTemplate               │ │
-│  │  AddOnDeploymentConfig                                │ │
+│  │  ClusterManagementAddOn + AddOnTemplate                │ │
+│  │  AddOnDeploymentConfig                                 │ │
 │  └────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                     Managed Cluster                         │
-│  namespace: flock-system                                   │
-│  Deployment: flock-agent                                   │
-│  Container: flock-alliance-client                          │
+│  namespace: flock-system                                    │
+│  Deployment: flock-agent                                    │
+│  Container: flock-alliance-client                           │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  Managed Cluster Node                       │
-│  hostPath: /data/flock-client                              │
-│  files: .env, datasets, model inputs                       │
+│  hostPath: /data/flock-client                               │
+│  files: .env, datasets, model inputs                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
