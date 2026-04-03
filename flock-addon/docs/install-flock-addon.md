@@ -52,7 +52,7 @@ Run on every managed cluster node that may host the addon Pod.
 # [Each Managed Cluster Node]
 sudo mkdir -p /data/flock-client
 sudo chmod 755 /data
-sudo chown -R ubuntu:ubuntu /data/flock-client
+sudo chown -R <login-user>:<login-group> /data/flock-client
 sudo chmod -R u+rwX /data/flock-client
 ```
 
@@ -82,8 +82,8 @@ Create this file on every managed cluster node:
 Recommended `.env` for `Local chain + local S3-compatible`:
 
 ```dotenv
-PRIVATE_KEY=0x...
-HF_TOKEN=hf_...
+PRIVATE_KEY=<private-key>
+HF_TOKEN=<hf-token>
 ```
 
 Ignore any secrets shown in historical testing notes. The important part is the variable layout, not the sample values.
@@ -115,7 +115,7 @@ make deploy-local-chain-s3-compatible \
   MODEL_ARCHIVE=/absolute/path/to/model.tar.gz \
   RPC_HOST=<hub-ip> \
   DOCKER='sudo docker' \
-  S3_COMPAT_DATA_DIR='/home/ubuntu/flock-minio/data'
+  S3_COMPAT_DATA_DIR='<local-minio-data-dir>'
 ```
 
 If your user can already access Docker without `sudo`, you can omit `DOCKER='sudo docker'`.
@@ -132,7 +132,7 @@ Optional image overrides:
 ```bash
 # [Hub]
 export IMAGE_REGISTRY='ghcr.io'
-export IMAGE_OWNER='flock-io'
+export IMAGE_OWNER='<image-owner>'
 export IMAGE_NAME='fl-alliance-client'
 export IMAGE_TAG='<git-sha-or-release-tag>'
 export IMAGE_PULL_POLICY='Always'
@@ -169,15 +169,15 @@ GPU/CPU template selection follows the hub-side `managedcluster` label `gpu=true
 
 ```bash
 # [Hub]
-make enable-addon CLUSTER=cluster1
+make enable-addon CLUSTER=<cluster-name>
 ```
 
 Check:
 
 ```bash
 # [Hub]
-kubectl -n cluster1 get managedclusteraddon flock-addon -o yaml
-kubectl -n cluster1 get manifestwork
+kubectl -n <cluster-name> get managedclusteraddon flock-addon -o yaml
+kubectl -n <cluster-name> get manifestwork
 ```
 
 Should see:
@@ -219,7 +219,7 @@ Should see:
 
 ```bash
 # [Hub]
-make disable-addon CLUSTER=cluster1
+make disable-addon CLUSTER=<cluster-name>
 make undeploy
 ```
 

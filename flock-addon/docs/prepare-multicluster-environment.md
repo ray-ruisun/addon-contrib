@@ -322,7 +322,7 @@ On every managed cluster node:
 ```bash
 sudo mkdir -p /data/flock-client
 sudo chmod 755 /data
-sudo chown -R ubuntu:ubuntu /data/flock-client
+sudo chown -R <login-user>:<login-group> /data/flock-client
 sudo chmod -R u+rwX /data/flock-client
 ```
 

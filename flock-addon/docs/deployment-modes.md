@@ -48,16 +48,16 @@ Use this mode only when you already have a ready testnet task and the external s
 
 ```bash
 # [Hub]
-make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+make deploy-testnet TASK_ADDRESS='0x<task-address>'
 ```
 
 Node `.env` example:
 
 ```dotenv
-PRIVATE_KEY=0x...
-HF_TOKEN=hf_...
-BLOCKCHAIN_RPC=https://sepolia.base.org
-TOKEN_ADDRESS=0x...
+PRIVATE_KEY=<private-key>
+HF_TOKEN=<hf-token>
+BLOCKCHAIN_RPC=<testnet-rpc-url>
+TOKEN_ADDRESS=0x<token-address>
 ```
 
 This flow is covered step by step in [Install FLock Addon](install-flock-addon.md).
@@ -110,8 +110,8 @@ Important:
 Managed cluster node `.env` for this mode only needs node-local secrets:
 
 ```dotenv
-PRIVATE_KEY=0x...
-HF_TOKEN=hf_...
+PRIVATE_KEY=<private-key>
+HF_TOKEN=<hf-token>
 ```
 
 Check:
@@ -168,8 +168,8 @@ Important:
 Managed cluster node `.env`:
 
 ```dotenv
-PRIVATE_KEY=0x...
-HF_TOKEN=hf_...
+PRIVATE_KEY=<private-key>
+HF_TOKEN=<hf-token>
 ```
 
 Prepare the archive you want the hub to upload, for example:
@@ -189,7 +189,7 @@ make deploy-local-chain-s3-compatible \
   MODEL_ARCHIVE=/path/to/model.tar.gz \
   RPC_HOST=<hub-ip> \
   DOCKER='sudo docker' \
-  S3_COMPAT_DATA_DIR='/home/ubuntu/flock-minio/data'
+  S3_COMPAT_DATA_DIR='<local-minio-data-dir>'
 ```
 
 `S3_COMPAT_DATA_DIR` defaults to `/srv/flock-minio/data`. Override it if your normal user cannot write there. If you keep the default path, create it first:

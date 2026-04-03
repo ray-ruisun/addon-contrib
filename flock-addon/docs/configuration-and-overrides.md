@@ -58,8 +58,8 @@ If the addon is already enabled, the managed cluster workload should reconcile a
 
 ```bash
 # [Hub]
-make disable-addon CLUSTER=cluster1
-make enable-addon CLUSTER=cluster1
+make disable-addon CLUSTER=<cluster-name>
+make enable-addon CLUSTER=<cluster-name>
 ```
 
 ## Parameter Flow
@@ -87,7 +87,7 @@ Example `AddOnDeploymentConfig`:
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: AddOnDeploymentConfig
 metadata:
-  name: flock-addon-config-cluster1
+  name: flock-addon-config-<cluster-name>
   namespace: open-cluster-management
 spec:
   agentInstallNamespace: flock-system
@@ -113,7 +113,7 @@ apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ManagedClusterAddOn
 metadata:
   name: flock-addon
-  namespace: cluster1
+  namespace: <cluster-name>
   annotations:
     addon.open-cluster-management.io/v1alpha1-install-namespace: flock-system
 spec:
@@ -123,7 +123,7 @@ spec:
       name: flock-addon
     - group: addon.open-cluster-management.io
       resource: addondeploymentconfigs
-      name: flock-addon-config-cluster1
+      name: flock-addon-config-<cluster-name>
       namespace: open-cluster-management
 ```
 

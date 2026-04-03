@@ -22,24 +22,24 @@ If the image looks wrong or stale, redeploy with an explicit override and re-ena
 
 ```bash
 # [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' IMAGE_PULL_POLICY='Always' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
-make disable-addon CLUSTER=cluster1
-make enable-addon CLUSTER=cluster1
+IMAGE_OWNER='<image-owner>' IMAGE_TAG='<git-sha-or-release-tag>' IMAGE_PULL_POLICY='Always' make <deploy-command> <mode-specific-args>
+make disable-addon CLUSTER=<cluster-name>
+make enable-addon CLUSTER=<cluster-name>
 ```
 
 If Pod events show `unauthorized` or `denied`, the registry needs credentials. Follow the pull-secret flow in [Image Management](image-management.md).
 
 ## OCM Distribution Problems
 
-If `make deploy-testnet` succeeds on the hub but nothing runs on the managed cluster, check the OCM distribution chain.
+If the hub-side addon deploy succeeds but nothing runs on the managed cluster, check the OCM distribution chain.
 
 Hub-side checks:
 
 ```bash
 # [Hub]
 kubectl get clustermanagementaddon flock-addon
-kubectl -n cluster1 get managedclusteraddon flock-addon -o yaml
-kubectl -n cluster1 get manifestwork
+kubectl -n <cluster-name> get managedclusteraddon flock-addon -o yaml
+kubectl -n <cluster-name> get manifestwork
 ```
 
 Should see:
@@ -52,8 +52,8 @@ If `ManagedClusterAddOn` exists but no `ManifestWork` appears, re-enable the add
 
 ```bash
 # [Hub]
-make disable-addon CLUSTER=cluster1
-make enable-addon CLUSTER=cluster1
+make disable-addon CLUSTER=<cluster-name>
+make enable-addon CLUSTER=<cluster-name>
 ```
 
 Managed-cluster checks:

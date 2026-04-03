@@ -23,18 +23,18 @@ Example:
 ```bash
 # [Hub]
 export IMAGE_REGISTRY='ghcr.io'
-export IMAGE_OWNER='ray-ruisun'
+export IMAGE_OWNER='<image-owner>'
 export IMAGE_NAME='fl-alliance-client'
 export IMAGE_TAG='<git-sha-or-release-tag>'
 export IMAGE_PULL_POLICY='Always'
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
-Use it for deployment:
+Use it for deployment. Replace the deploy command with the mode you are actually using:
 
 ```bash
 # [Hub]
-make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+make <deploy-command> <mode-specific-args>
 ```
 
 Check:
@@ -67,14 +67,14 @@ Example:
 unset IMAGE_PULL_SECRET
 export IMAGE_OWNER='flock-io'
 export IMAGE_TAG='<release-tag>'
-make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+make <deploy-command> <mode-specific-args>
 ```
 
 ## Private Image Repository
 
 Use this path when the image is private, for example:
 
-- `ghcr.io/your-org/fl-alliance-client:<git-sha-or-release-tag>`
+- `ghcr.io/<image-owner>/fl-alliance-client:<git-sha-or-release-tag>`
 
 How to operate:
 
@@ -97,11 +97,11 @@ Deploy from the hub:
 
 ```bash
 # [Hub]
-export IMAGE_OWNER='your-org'
+export IMAGE_OWNER='<image-owner>'
 export IMAGE_TAG='<git-sha-or-release-tag>'
 export IMAGE_PULL_SECRET='ghcr-pull'
 export IMAGE_PULL_POLICY='Always'
-make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+make <deploy-command> <mode-specific-args>
 ```
 
 Check:
@@ -180,9 +180,9 @@ If you republish the same tag, redeploy with an explicit image override and re-e
 
 ```bash
 # [Hub]
-IMAGE_OWNER='ray-ruisun' IMAGE_TAG='<git-sha-or-release-tag>' IMAGE_PULL_POLICY='Always' make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
-make disable-addon CLUSTER=cluster1
-make enable-addon CLUSTER=cluster1
+IMAGE_OWNER='<image-owner>' IMAGE_TAG='<git-sha-or-release-tag>' IMAGE_PULL_POLICY='Always' make <deploy-command> <mode-specific-args>
+make disable-addon CLUSTER=<cluster-name>
+make enable-addon CLUSTER=<cluster-name>
 ```
 
 If you also rotated credentials for a private registry, recreate the secret and restart the addon Pods:
