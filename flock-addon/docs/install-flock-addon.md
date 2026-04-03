@@ -103,6 +103,28 @@ Should see:
 
 In the recommended default mode, blockchain RPC, task address, token address, and S3-compatible storage settings are pushed from the hub. Node `.env` only needs node-local secrets.
 
+If you are using one of the other supported modes instead, use the matching `.env` shape:
+
+`Testnet`
+
+```dotenv
+PRIVATE_KEY=<private-key>
+HF_TOKEN=<hf-token>
+BLOCKCHAIN_RPC=<testnet-rpc-url>
+TOKEN_ADDRESS=0x<token-address>
+```
+
+Use this when the managed cluster should connect to an existing external blockchain endpoint and external S3-oriented workflow.
+
+`Local chain + original S3`
+
+```dotenv
+PRIVATE_KEY=<private-key>
+HF_TOKEN=<hf-token>
+```
+
+Use this when the hub will host the local chain, but model storage still depends on an already uploaded external S3 artifact.
+
 ## Step 3: Deploy the Addon Definition on the Hub
 
 Deploy the shared addon definition from the hub using the recommended self-contained mode:
@@ -162,6 +184,66 @@ Should see:
 - `TASK_ADDRESS` matches the hub-generated value
 - `BLOCKCHAIN_RPC` points to the hub-hosted local chain
 - `S3_COMPAT_ENDPOINT_URL` points to the hub-hosted local S3-compatible service
+
+## Alternative Step 3 Paths
+
+If you are not using the recommended default mode, replace Step 3 with one of the following hub-side deploy commands.
+
+### Option A: Testnet
+
+Use this only when you already have:
+
+- an existing on-chain task on testnet
+- a managed-cluster `.env` that includes `BLOCKCHAIN_RPC`
+- the external S3-oriented workflow already in place
+
+```bash
+# [Hub]
+cd flock-addon
+make deploy-testnet TASK_ADDRESS='0x<task-address>'
+```
+
+Check:
+
+```bash
+# [Hub]
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|BLOCKCHAIN_RPC|STORAGE_BACKEND|value"
+```
+
+Should see:
+
+- `TASK_ADDRESS` matches the value you passed
+- `STORAGE_BACKEND` is `s3`
+- `BLOCKCHAIN_RPC` is not forced from the hub for this mode
+
+### Option B: Local Chain + Original S3
+
+Use this when you want the hub to host the local chain, but your model artifact already exists in external S3 and you have its hash.
+
+```bash
+# [Hub]
+cd flock-addon
+make deploy-local-chain-s3 \
+  FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client \
+  MODEL_HASH=<sha256> \
+  RPC_HOST=<hub-ip> \
+  DOCKER='sudo docker'
+```
+
+Check:
+
+```bash
+# [Hub]
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|BLOCKCHAIN_RPC|STORAGE_BACKEND|value"
+```
+
+Should see:
+
+- `STORAGE_BACKEND` is `s3`
+- `BLOCKCHAIN_RPC` points to the hub-hosted local chain
+- `TASK_ADDRESS` matches the hub-generated local-chain task
+
+After any of the Step 3 variants above, continue with Step 4 and Step 5 unchanged.
 
 ## Step 4: Enable the Addon on a Managed Cluster
 
