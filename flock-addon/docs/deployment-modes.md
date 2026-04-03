@@ -1,14 +1,30 @@
 # Deployment Modes
 
-`flock-addon` supports three deployment modes. Choose the simplest one that matches your environment.
+`flock-addon` supports three deployment modes. The recommended default is `deploy-local-chain-s3-compatible`, because it keeps both blockchain and storage under hub-managed control and avoids depending on an existing on-chain task or external S3 bucket.
 
 ## Mode Summary
 
 | Mode | Command | Blockchain source | Storage backend | Model input |
 | --- | --- | --- | --- | --- |
-| Testnet | `make deploy-testnet` | Existing external RPC from node `.env` | `s3` | Existing onchain task |
-| Local chain + original S3 | `make deploy-local-chain-s3` | Hub starts local chain | `s3` | Existing uploaded `MODEL_HASH` |
 | Local chain + local S3-compatible | `make deploy-local-chain-s3-compatible` | Hub starts local chain | `nami` | Local `MODEL_ARCHIVE` uploaded by the hub |
+| Local chain + original S3 | `make deploy-local-chain-s3` | Hub starts local chain | `s3` | Existing uploaded `MODEL_HASH` |
+| Testnet | `make deploy-testnet` | Existing external RPC from node `.env` | `s3` | Existing onchain task |
+
+## Recommendation
+
+Start with `deploy-local-chain-s3-compatible` unless you already need a shared external environment.
+
+Why this is the default recommendation:
+
+- it does not require you to create a task on a public testnet first
+- it does not depend on a shared external S3 bucket
+- the hub manages the local chain and local S3-compatible object storage for you
+- it is the most self-contained path for cluster-level validation and iterative development
+
+Choose the other modes only when their external dependencies are already part of your workflow:
+
+- `deploy-testnet` requires an existing on-chain task and the testnet-oriented external storage flow
+- `deploy-local-chain-s3` still depends on an existing external S3 model artifact even though the chain is local
 
 ## Environment Requirements by Mode
 
@@ -28,7 +44,7 @@
 
 ## Testnet Mode
 
-Use this mode for the standard first deployment path.
+Use this mode only when you already have a ready testnet task and the external storage workflow in place.
 
 ```bash
 # [Hub]

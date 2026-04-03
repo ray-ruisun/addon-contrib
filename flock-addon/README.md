@@ -27,9 +27,11 @@ Integrate [FLock FL Alliance](https://github.com/FLock-io/FL-Alliance-Client) (`
 
 | Mode                              | Command | Best for |
 |-----------------------------------| --- | --- |
-| Testnet                           | `make deploy-testnet` | Standard first deployment against an existing blockchain endpoint |
-| Local chain + original S3         | `make deploy-local-chain-s3` | Hub-hosted local chain while reusing an existing uploaded model hash |
-| Local chain + local S3-compatible | `make deploy-local-chain-s3-compatible` | Fully local hub-side chain and object storage for development |
+| Local chain + local S3-compatible | `make deploy-local-chain-s3-compatible` | Recommended default path: fully self-contained deployment with hub-managed local chain and object storage |
+| Local chain + original S3         | `make deploy-local-chain-s3` | Use when you want a hub-hosted local chain but still depend on an existing external S3 model artifact |
+| Testnet                           | `make deploy-testnet` | Use when you already have an on-chain task and shared external S3 workflow ready on testnet |
+
+Recommended default: start with `Local chain + local S3-compatible`. It keeps blockchain and storage dependencies inside the managed environment, while the other two modes depend on an existing on-chain task and/or external S3 storage.
 
 Full mode details are in [Deployment Modes](docs/deployment-modes.md).
 

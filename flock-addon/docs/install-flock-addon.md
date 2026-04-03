@@ -1,6 +1,6 @@
 # Install FLock Addon
 
-This guide walks through the default first deployment for `flock-addon`: testnet mode with one `flock-agent` running on each enabled managed cluster.
+This guide walks through the recommended first deployment for `flock-addon`: `Local chain + local S3-compatible`, with one `flock-agent` running on each enabled managed cluster.
 
 Before using this guide, complete [Prepare Multi-Cluster Environment](prepare-multicluster-environment.md). In particular, make sure:
 
@@ -28,16 +28,21 @@ Before using this guide, complete [Prepare Multi-Cluster Environment](prepare-mu
 - OCM hub and managed clusters are already available and healthy
 - `kubectl`, `helm`, and `make` are installed on the hub
 - Every node that may run the addon Pod has a shared host path, usually `/data/flock-client`
-- You have a valid `TASK_ADDRESS` for the target testnet workflow
 - This repository is checked out on the hub machine:
 
 ```bash
 cd /path/to/addon-contrib/flock-addon
 ```
 
-If you need local-chain workflows instead, use [Deployment Modes](deployment-modes.md). If you need a custom or private image, use [Image Management](image-management.md) before enabling the addon.
+For the recommended default path, also prepare:
 
-If you are following older testing notes or screenshots, the old `make deploy` flow corresponds to `make deploy-testnet` in the current `Makefile`.
+- a checkout of `FL-Alliance-Client` on the hub machine
+- a local model archive such as `/absolute/path/to/model.tar.gz`
+- a hub IP or hostname reachable from managed clusters for `RPC_HOST`
+
+If you need a different deployment path, use [Deployment Modes](deployment-modes.md). If you need a custom or private image, use [Image Management](image-management.md) before enabling the addon.
+
+If you are following older testing notes or screenshots, the old `make deploy` flow maps conceptually to the hub-side addon deploy step, but the current `Makefile` uses explicit mode-specific commands such as `make deploy-local-chain-s3-compatible`.
 
 ## Step 1: Prepare the Node Path
 
@@ -74,13 +79,11 @@ Create this file on every managed cluster node:
 /data/flock-client/.env
 ```
 
-Example testnet `.env`:
+Recommended `.env` for `Local chain + local S3-compatible`:
 
 ```dotenv
 PRIVATE_KEY=0x...
 HF_TOKEN=hf_...
-BLOCKCHAIN_RPC=https://sepolia.base.org
-TOKEN_ADDRESS=0x...
 ```
 
 Ignore any secrets shown in historical testing notes. The important part is the variable layout, not the sample values.
@@ -96,18 +99,32 @@ sed -n '1,20p' /data/flock-client/.env
 Should see:
 
 - `.env` exists at `/data/flock-client/.env`
-- `PRIVATE_KEY`, `HF_TOKEN`, and `BLOCKCHAIN_RPC` are present
+- `PRIVATE_KEY` and `HF_TOKEN` are present
 
-In testnet mode, `BLOCKCHAIN_RPC` is read from each node's `.env`. The hub only pushes `TASK_ADDRESS` and other shared addon settings.
+In the recommended default mode, blockchain RPC, task address, token address, and S3-compatible storage settings are pushed from the hub. Node `.env` only needs node-local secrets.
 
 ## Step 3: Deploy the Addon Definition on the Hub
 
-Deploy the shared addon definition from the hub:
+Deploy the shared addon definition from the hub using the recommended self-contained mode:
 
 ```bash
 # [Hub]
 cd flock-addon
-make deploy-testnet TASK_ADDRESS='0x47B0397C6ae306002788D093b29bcD2EDAd19924'
+make deploy-local-chain-s3-compatible \
+  FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client \
+  MODEL_ARCHIVE=/absolute/path/to/model.tar.gz \
+  RPC_HOST=<hub-ip> \
+  DOCKER='sudo docker' \
+  S3_COMPAT_DATA_DIR='/home/ubuntu/flock-minio/data'
+```
+
+If your user can already access Docker without `sudo`, you can omit `DOCKER='sudo docker'`.
+
+If you prefer the default MinIO data directory, create it first:
+
+```bash
+sudo mkdir -p /srv/flock-minio/data
+sudo chown -R "$USER":"$(id -gn)" /srv/flock-minio
 ```
 
 Optional image overrides:
@@ -132,7 +149,7 @@ Check:
 # [Hub]
 kubectl get clustermanagementaddon flock-addon
 kubectl -n open-cluster-management get addontemplate flock-addon
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|FLOCK_ALLIANCE_IMAGE|value"
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|BLOCKCHAIN_RPC|S3_COMPAT_ENDPOINT_URL|FLOCK_ALLIANCE_IMAGE|value"
 ```
 
 Should see:
@@ -142,7 +159,9 @@ Should see:
 - `addontemplate/flock-addon-gpu` exists
 - `addondeploymentconfig/flock-addon-config` exists
 - `addondeploymentconfig/flock-addon-gpu-config` exists
-- `TASK_ADDRESS` matches the value you passed
+- `TASK_ADDRESS` matches the hub-generated value
+- `BLOCKCHAIN_RPC` points to the hub-hosted local chain
+- `S3_COMPAT_ENDPOINT_URL` points to the hub-hosted local S3-compatible service
 
 ## Step 4: Enable the Addon on a Managed Cluster
 
@@ -192,6 +211,7 @@ Should see:
 - `deployment/flock-agent` exists
 - the Pod becomes `Running`
 - logs show `FLockAlliance` startup
+- logs include the local chain and S3-compatible runtime path instead of missing RPC or storage errors
 - on `gpu=true` clusters, Pod resources show `request=1` and `limit=1` for `nvidia.com/gpu`
 - on CPU clusters, the GPU request fields are empty and the Pod still runs
 
@@ -205,7 +225,7 @@ make undeploy
 
 ## Next Steps
 
-- Use [Deployment Modes](deployment-modes.md) for local-chain workflows
+- Use [Deployment Modes](deployment-modes.md) for testnet or external-S3 workflows
 - Use [Image Management](image-management.md) for public/private registry setups and custom image publishing
 - Use [Configuration and Overrides](configuration-and-overrides.md) for task updates, path rules, and per-cluster customization
 - Use [Troubleshooting](troubleshooting.md) if the rollout reaches the hub but not the managed cluster
