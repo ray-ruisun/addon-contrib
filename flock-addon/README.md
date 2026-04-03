@@ -4,19 +4,24 @@ Integrate [FLock FL Alliance](https://github.com/FLock-io/FL-Alliance-Client) (`
 
 ## Key Characteristics
 
-- Runtime mode is fixed to `local`
-- `FLocKit` is not deployed as a separate addon workload
-- Each managed cluster runs one `flock-agent` Deployment in `flock-system`
-- Runtime configuration is loaded from a mounted node directory, usually `/data/flock-client`
+- OCM deploys the decentralized `FLockAlliance` client to managed clusters as a direct participant runtime
+- Supports one-command blockchain-backed deployment flows for testnet and local-chain development
+- Preserves the protocol's incentive-driven workflow, including on-chain task coordination and reward-oriented participation
+- Runtime mode is fixed to `local`, so each cluster joins the protocol with its own node-local data and secrets
+- `FLocKit` is not deployed as a separate addon workload; training runs under the `flock-alliance-client` process lifecycle
+- Each enabled managed cluster runs one `flock-agent` Deployment in `flock-system`
+- Runtime configuration, datasets, and model inputs are loaded from a mounted node directory, usually `/data/flock-client`
 
 ## Features
 
 | Capability | Description |
 | --- | --- |
-| Deployment | Declarative addon rollout from the hub through `ClusterManagementAddOn`, `AddOnTemplate`, and `AddOnDeploymentConfig` |
-| Scheduling | Automatic GPU/CPU template selection based on the managed cluster label `gpu=true` |
-| Runtime | One direct `flock-alliance-client` workload per managed cluster with node-mounted `.env` and local data |
-| Modes | Support for testnet, local chain + original S3, and local chain + local S3-compatible storage |
+| Decentralized FL | Runs `FLockAlliance`, a blockchain-backed federated learning client with on-chain task coordination and incentive-aware participation |
+| Deployment | Uses OCM primitives such as `ClusterManagementAddOn`, `AddOnTemplate`, and `AddOnDeploymentConfig` for declarative multi-cluster rollout |
+| Runtime Architecture | Keeps the addon simple with one direct `flock-alliance-client` workload per managed cluster and no separate `FLocKit` addon component |
+| Placement | Automatically selects CPU or GPU addon templates based on the managed cluster label `gpu=true` |
+| Data Locality | Reads `.env`, datasets, and model inputs from node-mounted storage so each cluster can train on its own local resources |
+| Modes | Supports testnet, local chain + original S3, and local chain + local S3-compatible storage workflows |
 
 ## Supported Deployment Modes
 
