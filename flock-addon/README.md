@@ -10,7 +10,6 @@ FLock addon deploys **FLockAlliance** to managed clusters as a direct client wor
 ## Documentation
 
 - [Install FLock Addon](docs/install-flock-addon.md)
-- [Troubleshooting](docs/troubleshooting.md)
 
 ## Primary Deployment Modes
 
