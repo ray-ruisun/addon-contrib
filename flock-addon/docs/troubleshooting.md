@@ -77,7 +77,7 @@ If `clusteradm accept` reports `no csr is approved yet`, approve the latest CSR 
 ```bash
 # [Hub]
 kubectl certificate approve <csr-name>
-clusteradm accept --clusters m1 --context "${CTX_HUB}"
+clusteradm accept --clusters <cluster-name> --context "${CTX_HUB}"
 ```
 
 If `clusteradm join` failed previously on a managed cluster, clean up and retry:

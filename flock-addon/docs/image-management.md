@@ -30,7 +30,7 @@ export IMAGE_PULL_POLICY='Always'
 export FLOCK_ALLIANCE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
-Use it for deployment. Replace the deploy command with the mode you are actually using:
+Use it for deployment. Replace the deploy command with the mode you are actually using. For exact mode-specific commands, see [Install FLock Addon](install-flock-addon.md) and [Deployment Modes](deployment-modes.md).
 
 ```bash
 # [Hub]

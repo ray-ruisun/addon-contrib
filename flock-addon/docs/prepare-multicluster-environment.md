@@ -100,8 +100,8 @@ Set a stable hub context name if needed:
 
 ```bash
 kubectl config get-contexts
-kubectl config rename-context kubernetes-admin@kubernetes hub1
-export CTX_HUB=hub1
+kubectl config rename-context kubernetes-admin@kubernetes <hub-context>
+export CTX_HUB=<hub-context>
 ```
 
 Initialize the hub:
@@ -119,14 +119,14 @@ clusteradm get token --context "${CTX_HUB}"
 For each managed cluster:
 
 1. Make sure the node is `Ready`, the CNI is healthy, and the control-plane taint is gone.
-2. Give the managed cluster context a stable name such as `m1`, `m2`, or `m3`.
+2. Give the managed cluster context a stable name such as `<cluster-a>`, `<cluster-b>`, or `<cluster-c>`.
 3. Run `clusteradm join` against that context.
 
 Example:
 
 ```bash
-kubectl config rename-context kubernetes-admin@kubernetes m1
-export CTX_MANAGED_CLUSTER=m1
+kubectl config rename-context kubernetes-admin@kubernetes <managed-context>
+export CTX_MANAGED_CLUSTER=<managed-context>
 
 clusteradm join \
   --hub-token <token-from-clusteradm-init-or-get-token> \
@@ -161,14 +161,14 @@ kubectl certificate approve <csr-name>
 Then accept the managed cluster:
 
 ```bash
-clusteradm accept --clusters m1 --context "${CTX_HUB}"
+clusteradm accept --clusters <managed-cluster-name> --context "${CTX_HUB}"
 ```
 
 Verify:
 
 ```bash
 kubectl get managedcluster
-kubectl get managedcluster m1 -o yaml | sed -n '/status:/,$p'
+kubectl get managedcluster <managed-cluster-name> -o yaml | sed -n '/status:/,$p'
 ```
 
 You want `Joined=True` and `Available=True`.
@@ -184,7 +184,7 @@ apiVersion: work.open-cluster-management.io/v1
 kind: ManifestWork
 metadata:
   name: demo-nginx
-  namespace: m1
+  namespace: <managed-cluster-name>
 spec:
   workload:
     manifests:
@@ -217,15 +217,15 @@ spec:
 Apply it from the hub:
 
 ```bash
-kubectl apply -f mw-nginx-m1.yaml
-kubectl -n m1 get manifestwork demo-nginx -o yaml | sed -n '/status:/,$p'
+kubectl apply -f mw-nginx-<managed-cluster-name>.yaml
+kubectl -n <managed-cluster-name> get manifestwork demo-nginx -o yaml | sed -n '/status:/,$p'
 ```
 
 Verify on the managed cluster:
 
 ```bash
-kubectl --context=m1 get ns demo
-kubectl --context=m1 -n demo get deploy nginx
+kubectl --context=<managed-context> get ns demo
+kubectl --context=<managed-context> -n demo get deploy nginx
 ```
 
 If this test fails, fix OCM registration or network reachability before moving on to `flock-addon`.
@@ -310,9 +310,9 @@ kubectl get node -o custom-columns=NAME:.metadata.name,GPU:.status.allocatable.n
 Label the managed clusters on the hub so `make enable-addon` will select the GPU template:
 
 ```bash
-kubectl label managedcluster m1 gpu=true --overwrite
-kubectl label managedcluster m2 gpu=true --overwrite
-kubectl label managedcluster m3 gpu=true --overwrite
+kubectl label managedcluster <cluster-a> gpu=true --overwrite
+kubectl label managedcluster <cluster-b> gpu=true --overwrite
+kubectl label managedcluster <cluster-c> gpu=true --overwrite
 ```
 
 ## 8. Prepare Managed-Cluster Data Mounts

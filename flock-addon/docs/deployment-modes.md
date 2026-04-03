@@ -66,9 +66,9 @@ Common rollout pattern after the hub-side deploy:
 
 ```bash
 # [Hub]
-make enable-addon CLUSTER=m1
-make enable-addon CLUSTER=m2
-make enable-addon CLUSTER=m3
+make enable-addon CLUSTER=<cluster-a>
+make enable-addon CLUSTER=<cluster-b>
+make enable-addon CLUSTER=<cluster-c>
 ```
 
 ## Local Chain + Original S3 Mode
@@ -141,12 +141,12 @@ After the hub-side deploy finishes, re-enable the addon on each target managed c
 
 ```bash
 # [Hub]
-make disable-addon CLUSTER=m1
-make enable-addon CLUSTER=m1
-make disable-addon CLUSTER=m2
-make enable-addon CLUSTER=m2
-make disable-addon CLUSTER=m3
-make enable-addon CLUSTER=m3
+make disable-addon CLUSTER=<cluster-a>
+make enable-addon CLUSTER=<cluster-a>
+make disable-addon CLUSTER=<cluster-b>
+make enable-addon CLUSTER=<cluster-b>
+make disable-addon CLUSTER=<cluster-c>
+make enable-addon CLUSTER=<cluster-c>
 ```
 
 ## Local Chain + Local S3-Compatible Storage Mode
@@ -258,12 +258,12 @@ After the hub-side deploy finishes, re-enable the addon on each target managed c
 
 ```bash
 # [Hub]
-make disable-addon CLUSTER=m1
-make enable-addon CLUSTER=m1
-make disable-addon CLUSTER=m2
-make enable-addon CLUSTER=m2
-make disable-addon CLUSTER=m3
-make enable-addon CLUSTER=m3
+make disable-addon CLUSTER=<cluster-a>
+make enable-addon CLUSTER=<cluster-a>
+make disable-addon CLUSTER=<cluster-b>
+make enable-addon CLUSTER=<cluster-b>
+make disable-addon CLUSTER=<cluster-c>
+make enable-addon CLUSTER=<cluster-c>
 ```
 
 ## How Runtime Values Are Chosen

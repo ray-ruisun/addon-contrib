@@ -191,9 +191,9 @@ To enable multiple clusters, repeat the same command:
 
 ```bash
 # [Hub]
-make enable-addon CLUSTER=m1
-make enable-addon CLUSTER=m2
-make enable-addon CLUSTER=m3
+make enable-addon CLUSTER=<cluster-a>
+make enable-addon CLUSTER=<cluster-b>
+make enable-addon CLUSTER=<cluster-c>
 ```
 
 ## Step 5: Verify Runtime on the Managed Cluster

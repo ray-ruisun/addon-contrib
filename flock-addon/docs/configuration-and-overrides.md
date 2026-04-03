@@ -133,9 +133,9 @@ Old direct run:
 
 ```bash
 python main.py \
-  --task-address 0x47B0397C6ae306002788D093b29bcD2EDAd19924 \
-  --dataset data/asr_sarawakmalay_whisper_format_client_ids.json \
-  --hf-token $HF_TOKEN \
+  --task-address 0x<task-address> \
+  --dataset /path/to/dataset \
+  --hf-token <hf-token> \
   --gpu
 ```
 
