@@ -101,7 +101,7 @@ Should see:
 - `.env` exists at `/data/flock-client/.env`
 - `PRIVATE_KEY` and `HF_TOKEN` are present
 
-In the recommended default mode, blockchain RPC, task address, token address, and S3-compatible storage settings are pushed from the hub. Node `.env` only needs node-local secrets.
+In the recommended default mode, blockchain RPC, task address, token address, and S3-compatible storage settings are pushed from the hub and override any stale values that may still be present in the node `.env`. Node `.env` only needs node-local secrets.
 
 If you are using one of the other supported modes instead, use the matching `.env` shape:
 
@@ -301,9 +301,19 @@ Should see:
 
 ```bash
 # [Hub]
+# Disable the addon on each cluster first so OCM garbage-collects the managed-cluster workload.
 make disable-addon CLUSTER=<cluster-name>
+
+# Remove the Helm release from the hub.
 make undeploy
+
+# Optional: if you also started the hub-hosted local MinIO via
+# `deploy-local-chain-s3-compatible`, stop it with one of:
+make stop-local-s3-compatible   # removes only the MinIO container
+make undeploy-all               # helm uninstall + stop-local-s3-compatible
 ```
+
+The local MinIO data directory (`S3_COMPAT_DATA_DIR`, default `/srv/flock-minio/data`) is intentionally left in place so you can reuse uploaded artifacts across re-deploys. Delete it manually when you are done.
 
 ## Next Steps
 

@@ -1,97 +1,68 @@
-apiVersion: addon.open-cluster-management.io/v1alpha1
-kind: AddOnDeploymentConfig
-metadata:
-  name: {{ .Values.deploymentConfig.name }}
-  namespace: {{ .Values.addon.namespace }}
-spec:
-  agentInstallNamespace: {{ .Values.agent.namespace }}
-  customizedVariables:
-    - name: FLOCK_ALLIANCE_IMAGE
-      value: {{ include "flock-addon.flockAllianceImage" . | quote }}
-    - name: DATA_PATH
-      value: {{ .Values.agent.dataPath | quote }}
-    - name: HOST_DATA_PATH
-      value: {{ .Values.agent.dataVolume.hostPath | quote }}
-    - name: BLOCKCHAIN_RPC
-      value: {{ .Values.deploymentConfig.blockchain.rpc | quote }}
-    - name: TOKEN_ADDRESS
-      value: {{ .Values.deploymentConfig.blockchain.tokenAddress | quote }}
-    - name: TASK_ADDRESS
-      value: {{ .Values.deploymentConfig.blockchain.taskAddress | quote }}
-    - name: STAKE
-      value: {{ .Values.deploymentConfig.blockchain.stake | quote }}
-    - name: STORAGE_BACKEND
-      value: {{ .Values.deploymentConfig.storage.backend | quote }}
-    - name: LOCAL_STORAGE_DIR
-      value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
-    - name: S3_COMPAT_ENDPOINT_URL
-      value: {{ .Values.deploymentConfig.storage.s3Compat.endpointUrl | quote }}
-    - name: S3_COMPAT_BUCKET
-      value: {{ .Values.deploymentConfig.storage.s3Compat.bucket | quote }}
-    - name: S3_COMPAT_ACCESS_KEY
-      value: {{ .Values.deploymentConfig.storage.s3Compat.accessKey | quote }}
-    - name: S3_COMPAT_SECRET_KEY
-      value: {{ .Values.deploymentConfig.storage.s3Compat.secretKey | quote }}
-    - name: S3_COMPAT_REGION
-      value: {{ .Values.deploymentConfig.storage.s3Compat.region | quote }}
-    - name: S3_COMPAT_ADDRESSING_STYLE
-      value: {{ .Values.deploymentConfig.storage.s3Compat.addressingStyle | quote }}
-    - name: S3_COMPAT_VERIFY_SSL
-      value: {{ .Values.deploymentConfig.storage.s3Compat.verifySsl | quote }}
-    - name: USE_GPU
-      value: {{ .Values.deploymentConfig.runtime.useGpu | quote }}
-    - name: FLOCK_ALLIANCE_ENV_FILE
-      value: {{ .Values.deploymentConfig.runtime.flockAllianceEnvFile | quote }}
-    - name: NO_INCENTIVE
-      value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
-    - name: NUM_PARTICIPANTS
-      value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
+{{- /*
+Two AddOnDeploymentConfig objects are rendered:
+
+  * {{ .Values.deploymentConfig.name }}     - CPU variant, USE_GPU pulled from
+                                              deploymentConfig.runtime.useGpu
+  * {{ .Values.deploymentConfig.gpuName }}  - GPU variant, USE_GPU pulled from
+                                              deploymentConfig.runtime.gpuUseGpu
+
+All other customizedVariables are identical, so they are rendered through a
+shared list and a small range loop to avoid drift between the two variants.
+*/ -}}
+{{- $variants := list
+    (dict "name" .Values.deploymentConfig.name    "useGpu" .Values.deploymentConfig.runtime.useGpu)
+    (dict "name" .Values.deploymentConfig.gpuName "useGpu" .Values.deploymentConfig.runtime.gpuUseGpu)
+-}}
+{{- range $index, $variant := $variants }}
+{{- if gt $index 0 }}
 ---
+{{- end }}
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: AddOnDeploymentConfig
 metadata:
-  name: {{ .Values.deploymentConfig.gpuName }}
-  namespace: {{ .Values.addon.namespace }}
+  name: {{ $variant.name }}
+  namespace: {{ $.Values.addon.namespace }}
 spec:
-  agentInstallNamespace: {{ .Values.agent.namespace }}
+  agentInstallNamespace: {{ $.Values.agent.namespace }}
   customizedVariables:
     - name: FLOCK_ALLIANCE_IMAGE
-      value: {{ include "flock-addon.flockAllianceImage" . | quote }}
+      value: {{ include "flock-addon.flockAllianceImage" $ | quote }}
     - name: DATA_PATH
-      value: {{ .Values.agent.dataPath | quote }}
+      value: {{ $.Values.agent.dataPath | quote }}
     - name: HOST_DATA_PATH
-      value: {{ .Values.agent.dataVolume.hostPath | quote }}
+      value: {{ $.Values.agent.dataVolume.hostPath | quote }}
     - name: BLOCKCHAIN_RPC
-      value: {{ .Values.deploymentConfig.blockchain.rpc | quote }}
+      value: {{ $.Values.deploymentConfig.blockchain.rpc | quote }}
     - name: TOKEN_ADDRESS
-      value: {{ .Values.deploymentConfig.blockchain.tokenAddress | quote }}
+      value: {{ $.Values.deploymentConfig.blockchain.tokenAddress | quote }}
     - name: TASK_ADDRESS
-      value: {{ .Values.deploymentConfig.blockchain.taskAddress | quote }}
+      value: {{ $.Values.deploymentConfig.blockchain.taskAddress | quote }}
     - name: STAKE
-      value: {{ .Values.deploymentConfig.blockchain.stake | quote }}
+      value: {{ $.Values.deploymentConfig.blockchain.stake | quote }}
     - name: STORAGE_BACKEND
-      value: {{ .Values.deploymentConfig.storage.backend | quote }}
+      value: {{ $.Values.deploymentConfig.storage.backend | quote }}
     - name: LOCAL_STORAGE_DIR
-      value: {{ .Values.deploymentConfig.storage.localSharedDir | quote }}
+      value: {{ $.Values.deploymentConfig.storage.localSharedDir | quote }}
     - name: S3_COMPAT_ENDPOINT_URL
-      value: {{ .Values.deploymentConfig.storage.s3Compat.endpointUrl | quote }}
+      value: {{ $.Values.deploymentConfig.storage.s3Compat.endpointUrl | quote }}
     - name: S3_COMPAT_BUCKET
-      value: {{ .Values.deploymentConfig.storage.s3Compat.bucket | quote }}
+      value: {{ $.Values.deploymentConfig.storage.s3Compat.bucket | quote }}
     - name: S3_COMPAT_ACCESS_KEY
-      value: {{ .Values.deploymentConfig.storage.s3Compat.accessKey | quote }}
+      value: {{ $.Values.deploymentConfig.storage.s3Compat.accessKey | quote }}
     - name: S3_COMPAT_SECRET_KEY
-      value: {{ .Values.deploymentConfig.storage.s3Compat.secretKey | quote }}
+      value: {{ $.Values.deploymentConfig.storage.s3Compat.secretKey | quote }}
     - name: S3_COMPAT_REGION
-      value: {{ .Values.deploymentConfig.storage.s3Compat.region | quote }}
+      value: {{ $.Values.deploymentConfig.storage.s3Compat.region | quote }}
     - name: S3_COMPAT_ADDRESSING_STYLE
-      value: {{ .Values.deploymentConfig.storage.s3Compat.addressingStyle | quote }}
+      value: {{ $.Values.deploymentConfig.storage.s3Compat.addressingStyle | quote }}
     - name: S3_COMPAT_VERIFY_SSL
-      value: {{ .Values.deploymentConfig.storage.s3Compat.verifySsl | quote }}
+      value: {{ $.Values.deploymentConfig.storage.s3Compat.verifySsl | quote }}
     - name: USE_GPU
-      value: {{ .Values.deploymentConfig.runtime.gpuUseGpu | quote }}
+      value: {{ $variant.useGpu | quote }}
     - name: FLOCK_ALLIANCE_ENV_FILE
-      value: {{ .Values.deploymentConfig.runtime.flockAllianceEnvFile | quote }}
+      value: {{ $.Values.deploymentConfig.runtime.flockAllianceEnvFile | quote }}
     - name: NO_INCENTIVE
-      value: {{ .Values.deploymentConfig.training.noIncentive | quote }}
+      value: {{ $.Values.deploymentConfig.training.noIncentive | quote }}
     - name: NUM_PARTICIPANTS
-      value: {{ .Values.deploymentConfig.training.numParticipants | quote }}
+      value: {{ $.Values.deploymentConfig.training.numParticipants | quote }}
+{{- end }}

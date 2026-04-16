@@ -1,3 +1,28 @@
+{{- /*
+AddOnTemplate renders the workload that every managed cluster will run when
+the flock-addon is enabled on it. Two templates are emitted:
+
+  * {{ include "flock-addon.templateName" . }}     - CPU variant
+  * {{ include "flock-addon.gpuTemplateName" . }}  - GPU variant, identical to
+    the CPU variant except for nvidia.com/gpu requests/limits.
+
+The Deployment entrypoint is a small POSIX-shell wrapper that:
+
+  1. Emits diagnostic logs (GPU visibility, nvidia-smi, env summary) so the
+     Pod logs always contain enough context to debug a rollout without
+     exec'ing into the container.
+  2. Snapshots hub-pushed environment variables BEFORE sourcing the node-
+     local .env file. The OCM-pushed values are authoritative: if a variable
+     is non-empty on the hub side, it wins over anything the node .env set.
+     If a variable is empty on the hub side, the node .env value is used.
+     This keeps shared deployment state (task address, storage backend,
+     blockchain RPC in hub-managed modes, etc.) consistent across the fleet
+     while still allowing per-node secrets (PRIVATE_KEY, HF_TOKEN, ...) to
+     live on each node.
+  3. Builds the final `python -u main.py ...` argv, with runtime overrides
+     that match the addon's documented semantics, and exec's it so signals
+     (SIGTERM from kubelet) reach the Python process directly.
+*/ -}}
 {{- $templates := list
     (dict "name" (include "flock-addon.templateName" .) "gpu" false)
     (dict "name" (include "flock-addon.gpuTemplateName" .) "gpu" true)
@@ -37,10 +62,14 @@ spec:
             labels:
               app.kubernetes.io/name: {{ $.Values.addon.name }}
               app.kubernetes.io/component: agent
+              app.kubernetes.io/variant: {{ if $template.gpu }}gpu{{ else }}cpu{{ end }}
             annotations:
               cluster-name: "{{`{{CLUSTER_NAME}}`}}"
           spec:
             replicas: {{ $.Values.agent.replicas }}
+            revisionHistoryLimit: 3
+            strategy:
+              type: Recreate
             selector:
               matchLabels:
                 app.kubernetes.io/name: {{ $.Values.addon.name }}
@@ -50,10 +79,12 @@ spec:
                 labels:
                   app.kubernetes.io/name: {{ $.Values.addon.name }}
                   app.kubernetes.io/component: agent
+                  app.kubernetes.io/variant: {{ if $template.gpu }}gpu{{ else }}cpu{{ end }}
                 annotations:
                   cluster-name: "{{`{{CLUSTER_NAME}}`}}"
               spec:
                 serviceAccountName: {{ $.Values.agent.serviceAccountName }}
+                terminationGracePeriodSeconds: 30
                 {{- with $.Values.agent.nodeSelector }}
                 nodeSelector:
                   {{- toYaml . | nindent 18 }}
@@ -92,27 +123,41 @@ spec:
                       - "/bin/sh"
                       - "-ec"
                       - |
-                        echo "[flock-addon] startup: USE_GPU=${USE_GPU:-} TASK_ADDRESS=${TASK_ADDRESS:-}"
+                        # ---------------------------------------------------------
+                        # flock-addon entrypoint.
+                        # Fails fast on any unexpected shell error (set -e from -ec).
+                        # ---------------------------------------------------------
+                        log() { printf '[flock-addon] %s\n' "$*"; }
+
+                        log "startup: image entrypoint beginning"
+                        log "vars: USE_GPU=${USE_GPU:-} STORAGE_BACKEND=${STORAGE_BACKEND:-} NO_INCENTIVE=${NO_INCENTIVE:-} NUM_PARTICIPANTS=${NUM_PARTICIPANTS:-}"
+                        log "vars: TASK_ADDRESS=${TASK_ADDRESS:-<empty>} TOKEN_ADDRESS=${TOKEN_ADDRESS:-<empty>} BLOCKCHAIN_RPC=${BLOCKCHAIN_RPC:-<empty>}"
+                        log "vars: DATA_PATH=${DATA_PATH:-} LOCAL_STORAGE_DIR=${LOCAL_STORAGE_DIR:-} FLOCK_ALLIANCE_ENV_FILE=${FLOCK_ALLIANCE_ENV_FILE:-}"
+
+                        # Device visibility: useful whether or not the Pod actually
+                        # requested GPUs, because a missing NVIDIA runtime is one of
+                        # the most common rollout failures on GPU-labeled nodes.
                         if ls /dev/nvidia* >/dev/null 2>&1; then
-                          echo "[flock-addon] NVIDIA device files detected:"
+                          log "NVIDIA device files detected:"
                           ls -l /dev/nvidia* || true
                         else
-                          echo "[flock-addon] No NVIDIA device files detected in container"
+                          log "no NVIDIA device files detected in container"
                         fi
                         if command -v nvidia-smi >/dev/null 2>&1; then
-                          echo "[flock-addon] nvidia-smi:"
+                          log "nvidia-smi:"
                           nvidia-smi || true
                         else
-                          echo "[flock-addon] nvidia-smi not available in image"
+                          log "nvidia-smi not available in image"
                         fi
 
-                        # Preserve the settings that are controlled centrally by OCM.
-                        # The mounted .env file still provides per-node secrets and
-                        # local connection details, but should not override the shared
-                        # deployment mode selected on the Hub.
+                        # ---------------------------------------------------------
+                        # Snapshot hub-pushed variables BEFORE sourcing node .env,
+                        # so a hub-pushed non-empty value always wins.
+                        # ---------------------------------------------------------
                         OCM_BLOCKCHAIN_RPC="${BLOCKCHAIN_RPC:-}"
                         OCM_TOKEN_ADDRESS="${TOKEN_ADDRESS:-}"
                         OCM_TASK_ADDRESS="${TASK_ADDRESS:-}"
+                        OCM_STAKE="${STAKE:-}"
                         OCM_LOCAL_STORAGE_DIR="${LOCAL_STORAGE_DIR:-}"
                         OCM_S3_COMPAT_ENDPOINT_URL="${S3_COMPAT_ENDPOINT_URL:-}"
                         OCM_S3_COMPAT_BUCKET="${S3_COMPAT_BUCKET:-}"
@@ -126,66 +171,97 @@ spec:
                         OCM_NO_INCENTIVE="${NO_INCENTIVE:-}"
                         OCM_NUM_PARTICIPANTS="${NUM_PARTICIPANTS:-}"
 
-                        if [ -n "${FLOCK_ALLIANCE_ENV_FILE:-}" ] && [ -f "${FLOCK_ALLIANCE_ENV_FILE}" ]; then
-                          set -a
-                          . "${FLOCK_ALLIANCE_ENV_FILE}"
-                          set +a
+                        # Source the node .env so per-node secrets (PRIVATE_KEY,
+                        # HF_TOKEN, ...) and optional BLOCKCHAIN_RPC for testnet
+                        # mode become part of the environment.
+                        if [ -n "${FLOCK_ALLIANCE_ENV_FILE:-}" ]; then
+                          if [ -f "${FLOCK_ALLIANCE_ENV_FILE}" ]; then
+                            log "loading env file: ${FLOCK_ALLIANCE_ENV_FILE}"
+                            set -a
+                            # shellcheck disable=SC1090
+                            . "${FLOCK_ALLIANCE_ENV_FILE}"
+                            set +a
+                          else
+                            log "env file not found: ${FLOCK_ALLIANCE_ENV_FILE} (continuing; hub-pushed values and container env will be used)"
+                          fi
+                        else
+                          log "FLOCK_ALLIANCE_ENV_FILE is empty; skipping node env load"
                         fi
 
-                        if [ -n "${OCM_TASK_ADDRESS:-}" ]; then export TASK_ADDRESS="${OCM_TASK_ADDRESS}"; fi
-                        if [ -n "${OCM_USE_GPU:-}" ]; then export USE_GPU="${OCM_USE_GPU}"; fi
-                        if [ -n "${OCM_STORAGE_BACKEND:-}" ]; then export STORAGE_BACKEND="${OCM_STORAGE_BACKEND}"; fi
-                        if [ -n "${OCM_NO_INCENTIVE:-}" ]; then export NO_INCENTIVE="${OCM_NO_INCENTIVE}"; fi
-                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_BLOCKCHAIN_RPC:-}" ]; then
-                          export BLOCKCHAIN_RPC="${OCM_BLOCKCHAIN_RPC}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_TOKEN_ADDRESS:-}" ]; then
-                          export TOKEN_ADDRESS="${OCM_TOKEN_ADDRESS}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_LOCAL_STORAGE_DIR:-}" ]; then
-                          export LOCAL_STORAGE_DIR="${OCM_LOCAL_STORAGE_DIR}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${OCM_NUM_PARTICIPANTS:-}" ]; then
-                          export NUM_PARTICIPANTS="${OCM_NUM_PARTICIPANTS}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_BLOCKCHAIN_RPC:-}" ]; then
-                          export BLOCKCHAIN_RPC="${OCM_BLOCKCHAIN_RPC}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_TOKEN_ADDRESS:-}" ]; then
-                          export TOKEN_ADDRESS="${OCM_TOKEN_ADDRESS}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_ENDPOINT_URL:-}" ]; then
-                          export S3_COMPAT_ENDPOINT_URL="${OCM_S3_COMPAT_ENDPOINT_URL}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_BUCKET:-}" ]; then
-                          export S3_COMPAT_BUCKET="${OCM_S3_COMPAT_BUCKET}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_ACCESS_KEY:-}" ]; then
-                          export S3_COMPAT_ACCESS_KEY="${OCM_S3_COMPAT_ACCESS_KEY}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_SECRET_KEY:-}" ]; then
-                          export S3_COMPAT_SECRET_KEY="${OCM_S3_COMPAT_SECRET_KEY}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_REGION:-}" ]; then
-                          export S3_COMPAT_REGION="${OCM_S3_COMPAT_REGION}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_ADDRESSING_STYLE:-}" ]; then
-                          export S3_COMPAT_ADDRESSING_STYLE="${OCM_S3_COMPAT_ADDRESSING_STYLE}"
-                        fi
-                        if [ "${STORAGE_BACKEND:-}" = "nami" ] && [ -n "${OCM_S3_COMPAT_VERIFY_SSL:-}" ]; then
-                          export S3_COMPAT_VERIFY_SSL="${OCM_S3_COMPAT_VERIFY_SSL}"
+                        # ---------------------------------------------------------
+                        # Reassert hub-pushed values. Rule: if the hub pushed a
+                        # non-empty value for a given variable, the hub wins,
+                        # regardless of storage backend. Only when the hub is
+                        # silent (empty value) do we keep whatever .env set.
+                        # ---------------------------------------------------------
+                        ocm_wins() {
+                          # $1 = variable name, $2 = hub-captured value
+                          if [ -n "${2:-}" ]; then
+                            export "$1=$2"
+                          fi
+                        }
+
+                        ocm_wins TASK_ADDRESS              "$OCM_TASK_ADDRESS"
+                        ocm_wins USE_GPU                   "$OCM_USE_GPU"
+                        ocm_wins STORAGE_BACKEND           "$OCM_STORAGE_BACKEND"
+                        ocm_wins NO_INCENTIVE              "$OCM_NO_INCENTIVE"
+                        ocm_wins NUM_PARTICIPANTS          "$OCM_NUM_PARTICIPANTS"
+                        ocm_wins STAKE                     "$OCM_STAKE"
+                        ocm_wins BLOCKCHAIN_RPC            "$OCM_BLOCKCHAIN_RPC"
+                        ocm_wins TOKEN_ADDRESS             "$OCM_TOKEN_ADDRESS"
+                        ocm_wins LOCAL_STORAGE_DIR         "$OCM_LOCAL_STORAGE_DIR"
+                        ocm_wins S3_COMPAT_ENDPOINT_URL    "$OCM_S3_COMPAT_ENDPOINT_URL"
+                        ocm_wins S3_COMPAT_BUCKET          "$OCM_S3_COMPAT_BUCKET"
+                        ocm_wins S3_COMPAT_ACCESS_KEY      "$OCM_S3_COMPAT_ACCESS_KEY"
+                        ocm_wins S3_COMPAT_SECRET_KEY      "$OCM_S3_COMPAT_SECRET_KEY"
+                        ocm_wins S3_COMPAT_REGION          "$OCM_S3_COMPAT_REGION"
+                        ocm_wins S3_COMPAT_ADDRESSING_STYLE "$OCM_S3_COMPAT_ADDRESSING_STYLE"
+                        ocm_wins S3_COMPAT_VERIFY_SSL      "$OCM_S3_COMPAT_VERIFY_SSL"
+
+                        log "effective: STORAGE_BACKEND=${STORAGE_BACKEND:-} USE_GPU=${USE_GPU:-} NO_INCENTIVE=${NO_INCENTIVE:-} NUM_PARTICIPANTS=${NUM_PARTICIPANTS:-}"
+                        log "effective: BLOCKCHAIN_RPC=${BLOCKCHAIN_RPC:+<set>}${BLOCKCHAIN_RPC:-<empty>} TOKEN_ADDRESS=${TOKEN_ADDRESS:+<set>}${TOKEN_ADDRESS:-<empty>} TASK_ADDRESS=${TASK_ADDRESS:+<set>}${TASK_ADDRESS:-<empty>}"
+                        if [ "${STORAGE_BACKEND:-}" = "nami" ]; then
+                          log "effective: S3_COMPAT_ENDPOINT_URL=${S3_COMPAT_ENDPOINT_URL:-} S3_COMPAT_BUCKET=${S3_COMPAT_BUCKET:-} S3_COMPAT_REGION=${S3_COMPAT_REGION:-}"
                         fi
 
+                        # Fail-fast preconditions per backend. Clear errors are
+                        # far easier to debug than a Python stack trace later.
+                        case "${STORAGE_BACKEND:-}" in
+                          s3|local|nami)
+                            ;;
+                          "")
+                            log "ERROR: STORAGE_BACKEND is empty; expected one of s3|local|nami"
+                            exit 2
+                            ;;
+                          *)
+                            log "ERROR: unsupported STORAGE_BACKEND=${STORAGE_BACKEND}; expected one of s3|local|nami"
+                            exit 2
+                            ;;
+                        esac
+
+                        if [ -z "${TASK_ADDRESS:-}" ]; then
+                          log "WARN: TASK_ADDRESS is empty; FLockAlliance will refuse to start if the onchain task cannot be resolved"
+                        fi
+
+                        # ---------------------------------------------------------
+                        # Build and exec the Python entrypoint. Overrides track
+                        # the documented runtime parameter flow. --override values
+                        # are only appended when their source env var is non-empty
+                        # so FLockAlliance's YAML defaults apply otherwise.
+                        # ---------------------------------------------------------
                         set -- python -u main.py \
                           --config config/conf.yaml \
                           --override "runtime.mode=local" \
                           --override "runtime.gpu=${USE_GPU}" \
                           --override "blockchain.stake=${STAKE}" \
                           --override "storage.backend=${STORAGE_BACKEND}" \
-                          --override "storage.local.shared_dir=${LOCAL_STORAGE_DIR}" \
                           --override "training.no_incentive=${NO_INCENTIVE}" \
                           --override "data.inputs=${DATA_PATH}"
-                        if [ "${STORAGE_BACKEND:-}" = "local" ] && [ -n "${NUM_PARTICIPANTS:-}" ]; then
+
+                        if [ -n "${LOCAL_STORAGE_DIR:-}" ]; then
+                          set -- "$@" --override "storage.local.shared_dir=${LOCAL_STORAGE_DIR}"
+                        fi
+                        if [ -n "${NUM_PARTICIPANTS:-}" ]; then
                           set -- "$@" --override "training.num_participants=${NUM_PARTICIPANTS}"
                         fi
                         if [ -n "${BLOCKCHAIN_RPC:-}" ]; then
@@ -198,6 +274,7 @@ spec:
                           set -- "$@" --override "blockchain.task_address=${TASK_ADDRESS}"
                         fi
 
+                        log "exec: $*"
                         exec "$@"
                     env:
                       - name: DATA_PATH
@@ -236,8 +313,6 @@ spec:
                         value: "{{`{{NUM_PARTICIPANTS}}`}}"
                       - name: FLOCK_ALLIANCE_ENV_FILE
                         value: "{{`{{FLOCK_ALLIANCE_ENV_FILE}}`}}"
-                      # TODO(flock-addon): if needed later, add optional secret-based
-                      # fallback for PRIVATE_KEY/HF_TOKEN. Current mode uses .env only.
                     volumeMounts:
                       - name: shared-data
                         mountPath: /data

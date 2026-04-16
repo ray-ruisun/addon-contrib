@@ -1,10 +1,33 @@
+# -----------------------------------------------------------------------------
+# flock-addon Makefile
+#
+# Entry points are grouped into sections:
+#
+#   Deployment       - user-facing `make deploy-*`, `make update-task`,
+#                      `make undeploy`, `make enable-addon`, `make disable-addon`
+#   CI Targets       - contract with the addon-contrib CI pipeline (verify,
+#                      build, test-unit, test-integration, test-e2e, test-chart)
+#   Development      - `make lint`, `make template`, `make status`
+#   Help             - `make help`
+#
+# The deploy flow delegates to Helm. Internal `_deploy-*` targets are
+# composition helpers; they are exposed with an underscore prefix to signal
+# that end users should run the public `deploy-*` wrappers instead.
+# -----------------------------------------------------------------------------
+
+# Tool binaries (override with DOCKER='sudo docker' when the current user has
+# no docker group membership, etc.).
 KUBECTL ?= kubectl
 HELM ?= helm
 DOCKER ?= docker
+
+# OCM + chart configuration.
 NAMESPACE ?= open-cluster-management
 RELEASE_NAME ?= flock-addon
 CHART_PATH ?= charts/flock-addon
 
+# Image coordinates. FLOCK_ALLIANCE_IMAGE wins over the four IMAGE_* components
+# when all are set, because the Makefile splits it at the final ':' via `cut`.
 IMAGE_REGISTRY ?= ghcr.io
 IMAGE_OWNER ?= flock-io
 IMAGE_NAME ?= fl-alliance-client
@@ -12,11 +35,21 @@ IMAGE_TAG ?= latest
 IMAGE_PULL_POLICY ?= Always
 FLOCK_ALLIANCE_IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_OWNER)/$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_PULL_SECRET ?=
+
+# External dependencies (only used by the hub-managed local-chain modes).
 FL_ALLIANCE_CLIENT_DIR ?=
 MODEL_ARCHIVE ?=
 MODEL_HASH ?=
 RPC_HOST ?=
+
+# When DOCKER='sudo docker', forward the sudo prefix (and -E to preserve env)
+# to the Compose subcommand. Otherwise use `<DOCKER> compose`. This is what
+# `make chain` inside FL-Alliance-Client consumes via DOCKER_COMPOSE=.
 CHAIN_DOCKER_COMPOSE ?= $(if $(filter sudo,$(word 1,$(DOCKER))),sudo -E $(wordlist 2,$(words $(DOCKER)),$(DOCKER)) compose,$(DOCKER) compose)
+
+# Local S3-compatible storage defaults (used only in the local-chain + nami
+# mode). These flow into Helm via `_deploy-local-chain-s3-compatible` and into
+# the MinIO container launched by `start-local-s3-compatible`.
 MINIO_IMAGE ?= quay.io/minio/minio
 MINIO_MC_IMAGE ?= quay.io/minio/mc
 S3_COMPAT_CONTAINER_NAME ?= flock-minio
@@ -30,12 +63,10 @@ S3_COMPAT_REGION ?= us-east-1
 S3_COMPAT_ADDRESSING_STYLE ?= path
 S3_COMPAT_VERIFY_SSL ?= false
 
+# Optional managed-cluster pull secret name (e.g. for private GHCR). Only
+# injected when non-empty so the default render stays clean.
 ifneq ($(strip $(IMAGE_PULL_SECRET)),)
 IMAGE_PULL_SECRET_ARG := --set image.pullSecrets[0]='$(IMAGE_PULL_SECRET)'
-endif
-
-ifeq ($(strip $(IMAGE_TAG)),)
-$(error IMAGE_TAG is empty. Set IMAGE_TAG to a git SHA or release tag before deploy, for example: export IMAGE_SHA=$$(git rev-parse --short=12 HEAD) && export IMAGE_TAG="$$IMAGE_SHA")
 endif
 
 .PHONY: all
@@ -44,7 +75,7 @@ all: help
 ##@ Deployment
 
 .PHONY: deploy-testnet
-deploy-testnet: ## Deploy for testnet mode (usage: make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...])
+deploy-testnet: ## Deploy addon for testnet mode (usage: make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...])
 ifndef TASK_ADDRESS
 	$(error TASK_ADDRESS is not set. Usage: make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...])
 endif
@@ -52,27 +83,13 @@ endif
 		--set addon.installStrategy=Manual \
 		--set placement.gpu.enabled=false \
 		--set placement.all.enabled=false \
-		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f2- | rev) \
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f1 | rev) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
 		--set deploymentConfig.storage.backend='s3'
-
-.PHONY: _deploy-s3-compatible
-_deploy-s3-compatible:
-	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
-		--set addon.installStrategy=Manual \
-		--set placement.gpu.enabled=false \
-		--set placement.all.enabled=false \
-		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
-		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
-		$(IMAGE_PULL_SECRET_ARG) \
-		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
-		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
-		--set deploymentConfig.storage.backend='nami'
 
 .PHONY: _deploy-local-chain-s3-compatible
 _deploy-local-chain-s3-compatible:
@@ -83,8 +100,8 @@ endif
 		--set addon.installStrategy=Manual \
 		--set placement.gpu.enabled=false \
 		--set placement.all.enabled=false \
-		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f2- | rev) \
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f1 | rev) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
 		--set deploymentConfig.blockchain.rpc='$(RPC)' \
@@ -108,8 +125,8 @@ endif
 		--set addon.installStrategy=Manual \
 		--set placement.gpu.enabled=false \
 		--set placement.all.enabled=false \
-		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f1) \
-		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | cut -d: -f2) \
+		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f2- | rev) \
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f1 | rev) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
 		--set deploymentConfig.blockchain.rpc='$(RPC)' \
@@ -118,10 +135,12 @@ endif
 		--set deploymentConfig.storage.backend='s3'
 
 .PHONY: start-local-s3-compatible
-start-local-s3-compatible:
-	@set -e; \
+start-local-s3-compatible: ## Start a local MinIO instance on the hub and ensure the bucket exists
+	@set -euo pipefail; \
 	mkdir -p '$(S3_COMPAT_DATA_DIR)'; \
+	echo "[flock-addon] ensuring local MinIO container: $(S3_COMPAT_CONTAINER_NAME)"; \
 	if $(DOCKER) ps -a --format '{{.Names}}' | grep -qx '$(S3_COMPAT_CONTAINER_NAME)'; then \
+		echo "[flock-addon] removing pre-existing container $(S3_COMPAT_CONTAINER_NAME)"; \
 		$(DOCKER) rm -f '$(S3_COMPAT_CONTAINER_NAME)' >/dev/null; \
 	fi; \
 	$(DOCKER) run -d \
@@ -132,15 +151,39 @@ start-local-s3-compatible:
 		-e MINIO_ROOT_PASSWORD='$(S3_COMPAT_SECRET_KEY)' \
 		-v '$(S3_COMPAT_DATA_DIR):/data' \
 		'$(MINIO_IMAGE)' server /data --console-address ":9001" >/dev/null; \
-	echo "Started local S3-compatible storage at http://127.0.0.1:$(S3_COMPAT_PORT)"; \
-	sleep 3; \
+	echo "[flock-addon] MinIO listening at http://127.0.0.1:$(S3_COMPAT_PORT) (console http://127.0.0.1:$(S3_COMPAT_CONSOLE_PORT))"; \
+	# Wait until the MinIO /minio/health/ready endpoint succeeds (up to 30s) before
+	# attempting bucket provisioning, rather than relying on a fixed sleep.
+	for i in $$(seq 1 30); do \
+		if $(DOCKER) run --rm --network host --entrypoint /bin/sh '$(MINIO_MC_IMAGE)' -ec \
+			'mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && mc ready local >/dev/null 2>&1'; then \
+			echo "[flock-addon] MinIO ready after $$i second(s)"; \
+			break; \
+		fi; \
+		if [ $$i -eq 30 ]; then \
+			echo "[flock-addon] ERROR: MinIO did not become ready within 30s" >&2; \
+			$(DOCKER) logs --tail=40 '$(S3_COMPAT_CONTAINER_NAME)' >&2 || true; \
+			exit 1; \
+		fi; \
+		sleep 1; \
+	done; \
 	$(DOCKER) run --rm --network host --entrypoint /bin/sh '$(MINIO_MC_IMAGE)' -ec '\
 		mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && \
 		mc mb --ignore-existing local/$(S3_COMPAT_BUCKET) >/dev/null'; \
-	echo "Ensured bucket $(S3_COMPAT_BUCKET) exists"
+	echo "[flock-addon] bucket ensured: $(S3_COMPAT_BUCKET)"
+
+.PHONY: stop-local-s3-compatible
+stop-local-s3-compatible: ## Stop and remove the local MinIO container (leaves data dir intact)
+	@set -eu; \
+	if $(DOCKER) ps -a --format '{{.Names}}' | grep -qx '$(S3_COMPAT_CONTAINER_NAME)'; then \
+		echo "[flock-addon] removing container $(S3_COMPAT_CONTAINER_NAME)"; \
+		$(DOCKER) rm -f '$(S3_COMPAT_CONTAINER_NAME)' >/dev/null; \
+	else \
+		echo "[flock-addon] no container named $(S3_COMPAT_CONTAINER_NAME); nothing to do"; \
+	fi
 
 .PHONY: deploy-local-chain-s3
-deploy-local-chain-s3: ## Use an existing uploaded MODEL_HASH, auto-start local chain on the Hub, then deploy addon with original signer-based S3 storage
+deploy-local-chain-s3: ## Auto-start local chain on the Hub using a pre-uploaded MODEL_HASH, then deploy the addon with the original signer-based S3 storage
 ifndef FL_ALLIANCE_CLIENT_DIR
 	$(error FL_ALLIANCE_CLIENT_DIR is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_HASH=<sha256> RPC_HOST=<hub-ip>)
 endif
@@ -150,8 +193,8 @@ endif
 ifndef RPC_HOST
 	$(error RPC_HOST is not set. Usage: make deploy-local-chain-s3 FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_HASH=<sha256> RPC_HOST=<hub-ip>)
 endif
-	@set -e; \
-	echo "MODEL_HASH=$(MODEL_HASH)"; \
+	@set -euo pipefail; \
+	echo "[flock-addon] MODEL_HASH=$(MODEL_HASH)"; \
 	$(MAKE) -C '$(FL_ALLIANCE_CLIENT_DIR)' chain \
 		$(if $(strip $(CHAIN_DOCKER_COMPOSE)),DOCKER_COMPOSE='$(CHAIN_DOCKER_COMPOSE)') \
 		MODEL_DEFINITION_HASH='$(MODEL_HASH)' \
@@ -159,21 +202,26 @@ endif
 		$(if $(strip $(MIN_PARTICIPANTS)),MIN_PARTICIPANTS='$(MIN_PARTICIPANTS)') \
 		$(if $(strip $(TIME_TO_PROPOSE)),TIME_TO_PROPOSE='$(TIME_TO_PROPOSE)') \
 		$(if $(strip $(TIME_TO_VOTE)),TIME_TO_VOTE='$(TIME_TO_VOTE)'); \
-	TOKEN_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockToken']['address'])"); \
-	TASK_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockTask']['address'])"); \
-	if [ -z "$$TOKEN_ADDRESS" ] || [ -z "$$TASK_ADDRESS" ]; then \
-		echo "ERROR: FL-Alliance-Client chain deployment did not produce TOKEN_ADDRESS/TASK_ADDRESS"; \
+	CONTRACTS='$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'; \
+	if [ ! -f "$$CONTRACTS" ]; then \
+		echo "[flock-addon] ERROR: $$CONTRACTS not found; did 'make chain' fail?" >&2; \
 		exit 1; \
 	fi; \
-	echo "TOKEN_ADDRESS=$$TOKEN_ADDRESS"; \
-	echo "TASK_ADDRESS=$$TASK_ADDRESS"; \
+	TOKEN_ADDRESS=$$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['FlockToken']['address'])" "$$CONTRACTS"); \
+	TASK_ADDRESS=$$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['FlockTask']['address'])" "$$CONTRACTS"); \
+	if [ -z "$$TOKEN_ADDRESS" ] || [ -z "$$TASK_ADDRESS" ]; then \
+		echo "[flock-addon] ERROR: FL-Alliance-Client chain deployment did not produce TOKEN_ADDRESS/TASK_ADDRESS" >&2; \
+		exit 1; \
+	fi; \
+	echo "[flock-addon] TOKEN_ADDRESS=$$TOKEN_ADDRESS"; \
+	echo "[flock-addon] TASK_ADDRESS=$$TASK_ADDRESS"; \
 	$(MAKE) _deploy-local-chain-s3 \
 		RPC='http://$(RPC_HOST):8545' \
 		TOKEN_ADDRESS="$$TOKEN_ADDRESS" \
 		TASK_ADDRESS="$$TASK_ADDRESS"
 
 .PHONY: deploy-local-chain-s3-compatible
-deploy-local-chain-s3-compatible: ## Auto-start local chain and local S3-compatible storage on the Hub, upload model archive, then deploy addon
+deploy-local-chain-s3-compatible: ## Auto-start local chain + local S3-compatible storage on the Hub, upload MODEL_ARCHIVE, then deploy the addon
 ifndef FL_ALLIANCE_CLIENT_DIR
 	$(error FL_ALLIANCE_CLIENT_DIR is not set. Usage: make deploy-local-chain-s3-compatible FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
 endif
@@ -183,20 +231,24 @@ endif
 ifndef RPC_HOST
 	$(error RPC_HOST is not set. Usage: make deploy-local-chain-s3-compatible FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client MODEL_ARCHIVE=/path/to/model.tar.gz RPC_HOST=<hub-ip>)
 endif
-	@set -e; \
+	@set -euo pipefail; \
+	if [ ! -f '$(MODEL_ARCHIVE)' ]; then \
+		echo "[flock-addon] ERROR: MODEL_ARCHIVE does not exist: $(MODEL_ARCHIVE)" >&2; \
+		exit 1; \
+	fi; \
 	MODEL_HASH=$$(sha256sum '$(MODEL_ARCHIVE)' | cut -d' ' -f1); \
 	MODEL_DIR=$$(cd "$$(dirname '$(MODEL_ARCHIVE)')" && pwd); \
 	MODEL_BASENAME=$$(basename '$(MODEL_ARCHIVE)'); \
 	S3_ENDPOINT='http://$(RPC_HOST):$(S3_COMPAT_PORT)'; \
-	echo "MODEL_HASH=$$MODEL_HASH"; \
+	echo "[flock-addon] MODEL_HASH=$$MODEL_HASH"; \
 	$(MAKE) start-local-s3-compatible; \
+	echo "[flock-addon] uploading $(MODEL_ARCHIVE) to bucket $(S3_COMPAT_BUCKET) with key $$MODEL_HASH"; \
 	$(DOCKER) run --rm --network host --entrypoint /bin/sh \
 		-e MODEL_BASENAME="$$MODEL_BASENAME" \
 		-e MODEL_HASH="$$MODEL_HASH" \
 		-v "$$MODEL_DIR:/upload:ro" '$(MINIO_MC_IMAGE)' -ec '\
 		mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && \
 		mc cp "/upload/$${MODEL_BASENAME}" "local/$(S3_COMPAT_BUCKET)/$${MODEL_HASH}" >/dev/null'; \
-	echo "Uploaded $(MODEL_ARCHIVE) to local S3-compatible bucket $(S3_COMPAT_BUCKET) with key $$MODEL_HASH"; \
 	$(MAKE) -C '$(FL_ALLIANCE_CLIENT_DIR)' chain \
 		$(if $(strip $(CHAIN_DOCKER_COMPOSE)),DOCKER_COMPOSE='$(CHAIN_DOCKER_COMPOSE)') \
 		MODEL_DEFINITION_HASH="$$MODEL_HASH" \
@@ -204,14 +256,19 @@ endif
 		$(if $(strip $(MIN_PARTICIPANTS)),MIN_PARTICIPANTS='$(MIN_PARTICIPANTS)') \
 		$(if $(strip $(TIME_TO_PROPOSE)),TIME_TO_PROPOSE='$(TIME_TO_PROPOSE)') \
 		$(if $(strip $(TIME_TO_VOTE)),TIME_TO_VOTE='$(TIME_TO_VOTE)'); \
-	TOKEN_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockToken']['address'])"); \
-	TASK_ADDRESS=$$(python3 -c "import json; print(json.load(open('$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'))['FlockTask']['address'])"); \
-	if [ -z "$$TOKEN_ADDRESS" ] || [ -z "$$TASK_ADDRESS" ]; then \
-		echo "ERROR: FL-Alliance-Client chain deployment did not produce TOKEN_ADDRESS/TASK_ADDRESS"; \
+	CONTRACTS='$(FL_ALLIANCE_CLIENT_DIR)/data/contracts.json'; \
+	if [ ! -f "$$CONTRACTS" ]; then \
+		echo "[flock-addon] ERROR: $$CONTRACTS not found; did 'make chain' fail?" >&2; \
 		exit 1; \
 	fi; \
-	echo "TOKEN_ADDRESS=$$TOKEN_ADDRESS"; \
-	echo "TASK_ADDRESS=$$TASK_ADDRESS"; \
+	TOKEN_ADDRESS=$$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['FlockToken']['address'])" "$$CONTRACTS"); \
+	TASK_ADDRESS=$$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['FlockTask']['address'])" "$$CONTRACTS"); \
+	if [ -z "$$TOKEN_ADDRESS" ] || [ -z "$$TASK_ADDRESS" ]; then \
+		echo "[flock-addon] ERROR: FL-Alliance-Client chain deployment did not produce TOKEN_ADDRESS/TASK_ADDRESS" >&2; \
+		exit 1; \
+	fi; \
+	echo "[flock-addon] TOKEN_ADDRESS=$$TOKEN_ADDRESS"; \
+	echo "[flock-addon] TASK_ADDRESS=$$TASK_ADDRESS"; \
 	$(MAKE) _deploy-local-chain-s3-compatible \
 		RPC='http://$(RPC_HOST):8545' \
 		TOKEN_ADDRESS="$$TOKEN_ADDRESS" \
@@ -225,7 +282,7 @@ endif
 		S3_COMPAT_VERIFY_SSL='$(S3_COMPAT_VERIFY_SSL)'
 
 .PHONY: update-task
-update-task: ## Update shared task address only (usage: make update-task TASK_ADDRESS=0x...)
+update-task: ## Update the shared task address only (usage: make update-task TASK_ADDRESS=0x...)
 ifndef TASK_ADDRESS
 	$(error TASK_ADDRESS is not set. Usage: make update-task TASK_ADDRESS=0x...)
 endif
@@ -234,15 +291,20 @@ endif
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
 .PHONY: undeploy
-undeploy: ## Remove FLock addon release
+undeploy: ## Remove the FLock addon Helm release (managed cluster workloads are garbage-collected by OCM)
+	@echo "[flock-addon] uninstalling Helm release $(RELEASE_NAME)"
 	$(HELM) uninstall $(RELEASE_NAME) || true
 
+.PHONY: undeploy-all
+undeploy-all: undeploy stop-local-s3-compatible ## Full local cleanup: helm uninstall + stop local MinIO container
+
 .PHONY: enable-addon
-enable-addon: ## Enable addon on a cluster; auto-select gpu/cpu template from managedcluster label gpu=true (override with CONFIG=/TEMPLATE=)
+enable-addon: ## Enable the addon on a managed cluster; auto-selects GPU/CPU template via managedcluster label `gpu=true` (override with CONFIG=/TEMPLATE=)
 ifndef CLUSTER
 	$(error CLUSTER is not set. Usage: make enable-addon CLUSTER=cluster1 [CONFIG=flock-addon-config] [TEMPLATE=flock-addon])
 endif
-	@GPU_LABEL=$$($(KUBECTL) get managedcluster $(CLUSTER) -o jsonpath='{.metadata.labels.gpu}' 2>/dev/null || true); \
+	@set -eu; \
+	GPU_LABEL=$$($(KUBECTL) get managedcluster $(CLUSTER) -o jsonpath='{.metadata.labels.gpu}' 2>/dev/null || true); \
 	if [ -n "$(TEMPLATE)" ]; then \
 		TEMPLATE_NAME='$(TEMPLATE)'; \
 	elif [ "$$GPU_LABEL" = "true" ]; then \
@@ -257,33 +319,36 @@ endif
 	else \
 		CONFIG_NAME='$(RELEASE_NAME)-config'; \
 	fi; \
-	echo "apiVersion: addon.open-cluster-management.io/v1alpha1" | \
-	{ cat; echo "kind: ManagedClusterAddOn"; } | \
-	{ cat; echo "metadata:"; } | \
-	{ cat; echo "  name: flock-addon"; } | \
-	{ cat; echo "  namespace: $(CLUSTER)"; } | \
-	{ cat; echo "  annotations:"; } | \
-	{ cat; echo "    addon.open-cluster-management.io/v1alpha1-install-namespace: flock-system"; } | \
-	{ cat; echo "spec:"; } | \
-	{ cat; echo "  configs:"; } | \
-	{ cat; echo "    - group: addon.open-cluster-management.io"; } | \
-	{ cat; echo "      resource: addontemplates"; } | \
-	{ cat; echo "      name: $$TEMPLATE_NAME"; } | \
-	{ cat; echo "    - group: addon.open-cluster-management.io"; } | \
-	{ cat; echo "      resource: addondeploymentconfigs"; } | \
-	{ cat; echo "      name: $$CONFIG_NAME"; } | \
-	{ cat; echo "      namespace: $(NAMESPACE)"; } | \
-	$(KUBECTL) apply -f -
+	echo "[flock-addon] enabling addon on cluster=$(CLUSTER) template=$$TEMPLATE_NAME config=$$CONFIG_NAME"; \
+	printf '%s\n' \
+		'apiVersion: addon.open-cluster-management.io/v1alpha1' \
+		'kind: ManagedClusterAddOn' \
+		'metadata:' \
+		'  name: $(RELEASE_NAME)' \
+		'  namespace: $(CLUSTER)' \
+		'  annotations:' \
+		'    addon.open-cluster-management.io/v1alpha1-install-namespace: flock-system' \
+		'spec:' \
+		'  configs:' \
+		'    - group: addon.open-cluster-management.io' \
+		'      resource: addontemplates' \
+		"      name: $$TEMPLATE_NAME" \
+		'    - group: addon.open-cluster-management.io' \
+		'      resource: addondeploymentconfigs' \
+		"      name: $$CONFIG_NAME" \
+		'      namespace: $(NAMESPACE)' \
+		| $(KUBECTL) apply -f -
 
 .PHONY: disable-addon
-disable-addon: ## Disable addon on a cluster (usage: make disable-addon CLUSTER=cluster1)
+disable-addon: ## Disable the addon on a managed cluster (usage: make disable-addon CLUSTER=cluster1)
 ifndef CLUSTER
 	$(error CLUSTER is not set. Usage: make disable-addon CLUSTER=cluster1)
 endif
-	$(KUBECTL) delete managedclusteraddon flock-addon -n $(CLUSTER) --ignore-not-found
+	@echo "[flock-addon] disabling addon on cluster=$(CLUSTER)"
+	$(KUBECTL) delete managedclusteraddon $(RELEASE_NAME) -n $(CLUSTER) --ignore-not-found
 
 .PHONY: status
-status: ## Show addon objects
+status: ## Print addon-related objects (hub-side)
 	$(KUBECTL) get clustermanagementaddons
 	$(KUBECTL) get addontemplates
 	$(KUBECTL) get addondeploymentconfigs -A
@@ -292,28 +357,28 @@ status: ## Show addon objects
 ##@ CI Targets
 
 .PHONY: verify
-verify: lint ## Verify chart and templates
-	@echo "Verification complete"
+verify: lint template ## Verify chart by running helm lint and a template render
+	@echo "[flock-addon] verify complete"
 
 .PHONY: vendor
-vendor: ## No-op vendor target for non-Go addon
-	@echo "No vendor step required"
+vendor: ## No-op vendor target (Helm-only addon)
+	@echo "[flock-addon] no vendor step required"
 
 .PHONY: build
-build: ## No-op build target for Helm-only addon
-	@echo "No build required"
+build: ## No-op build target (Helm-only addon; images are built in source repositories)
+	@echo "[flock-addon] no build required"
 
 .PHONY: test-unit
-test-unit: ## No-op unit tests for Helm-only addon
-	@echo "No unit tests"
+test-unit: ## No-op unit tests (Helm-only addon)
+	@echo "[flock-addon] no unit tests"
 
 .PHONY: test-integration
-test-integration: ## No-op integration tests for Helm-only addon
-	@echo "No integration tests"
+test-integration: ## No-op integration tests (Helm-only addon)
+	@echo "[flock-addon] no integration tests"
 
 .PHONY: test-e2e
-test-e2e: ## No-op e2e tests for Helm-only addon
-	@echo "No e2e tests"
+test-e2e: ## No-op e2e tests (Helm-only addon)
+	@echo "[flock-addon] no e2e tests"
 
 .PHONY: test-chart
 test-chart: ## Helm chart validation used by CI
@@ -321,15 +386,15 @@ test-chart: ## Helm chart validation used by CI
 
 .PHONY: image
 image: ## No-op image target; images are built in source repositories
-	@echo "Use source repositories to build images"
+	@echo "[flock-addon] use source repositories to build images"
 
 .PHONY: image-push
 image-push: ## No-op image push target
-	@echo "Use source repositories to push images"
+	@echo "[flock-addon] use source repositories to push images"
 
 .PHONY: image-manifest
 image-manifest: ## No-op multi-arch manifest target
-	@echo "Use source repositories to publish manifests"
+	@echo "[flock-addon] use source repositories to publish manifests"
 
 ##@ Development
 
@@ -338,11 +403,17 @@ lint: ## Lint the Helm chart
 	$(HELM) lint $(CHART_PATH)
 
 .PHONY: template
-template: ## Render templates locally
-	$(HELM) template $(RELEASE_NAME) $(CHART_PATH)
+template: ## Render templates locally (useful for diffing across modes)
+	@$(HELM) template $(RELEASE_NAME) $(CHART_PATH) >/dev/null
+	@echo "[flock-addon] default render OK"
+	@$(HELM) template $(RELEASE_NAME) $(CHART_PATH) \
+		--set addon.installStrategy=Placements \
+		--set placement.gpu.enabled=true \
+		--set placement.all.enabled=true >/dev/null
+	@echo "[flock-addon] Placements render OK"
 
 ##@ Help
 
 .PHONY: help
 help: ## Display this help
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-34s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)

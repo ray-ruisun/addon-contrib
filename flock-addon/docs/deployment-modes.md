@@ -268,7 +268,22 @@ make enable-addon CLUSTER=<cluster-c>
 
 ## How Runtime Values Are Chosen
 
-- In testnet mode, `BLOCKCHAIN_RPC` comes from each node `.env`
-- In `deploy-local-chain-s3`, the hub pushes `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`, and `TASK_ADDRESS`
-- In `deploy-local-chain-s3-compatible`, the hub also pushes S3-compatible settings
-- `TASK_ADDRESS`, `USE_GPU`, `STORAGE_BACKEND`, and `NO_INCENTIVE` stay authoritative from OCM in all modes
+The entrypoint uses a single, backend-independent rule: whenever the hub pushes a non-empty value for a variable, that hub value wins over anything the node `.env` might set. Variables the hub leaves empty fall through to the node `.env` and, if still unset, to the FLockAlliance YAML defaults. Full details are in [Configuration and Overrides](configuration-and-overrides.md).
+
+Practical consequence per mode:
+
+- Testnet: the hub keeps `BLOCKCHAIN_RPC` empty, so each node `.env` supplies it. `TASK_ADDRESS`, `STORAGE_BACKEND=s3`, and the GPU selection stay hub-authoritative.
+- `deploy-local-chain-s3`: the hub pushes `BLOCKCHAIN_RPC`, `TOKEN_ADDRESS`, and `TASK_ADDRESS`; `STORAGE_BACKEND=s3`.
+- `deploy-local-chain-s3-compatible`: same as above plus every `S3_COMPAT_*` setting, and `STORAGE_BACKEND=nami`.
+
+## Cleanup
+
+```bash
+# [Hub]
+# Remove only the Helm release (managed cluster workloads are garbage-collected by OCM):
+make undeploy
+
+# Remove the Helm release AND stop the local MinIO container started by
+# deploy-local-chain-s3-compatible (the data directory is left on disk):
+make undeploy-all
+```

@@ -175,6 +175,33 @@ kubectl -n flock-system exec "$POD" -c flock-alliance-client -- sh -lc 'f=$(ls -
 kubectl -n flock-system exec "$POD" -c flock-alliance-client -- sh -lc 'f=$(ls -1t /app/output/task_outputs/process_*.log | head -n1); tail -f "$f"'
 ```
 
+## Confirm Hub Values Reached the Client
+
+The entrypoint logs the raw hub values before sourcing `.env`, the `.env` load itself, and the effective values that will be passed to `FLockAlliance`. To verify the authoritative pipeline is working:
+
+```bash
+# [Managed Cluster context]
+POD=$(kubectl -n flock-system get pod -l app.kubernetes.io/component=agent -o jsonpath='{.items[0].metadata.name}')
+kubectl -n flock-system logs "$POD" -c flock-alliance-client --tail=200 | rg -n "^\[flock-addon\]"
+```
+
+Should see three kinds of lines:
+
+- `startup: image entrypoint beginning`
+- `vars: USE_GPU=... STORAGE_BACKEND=... TASK_ADDRESS=...` (raw hub-pushed values)
+- `loading env file: /data/.env` (or a warning if it is missing)
+- `effective: STORAGE_BACKEND=... TASK_ADDRESS=...` (final values after OCM-wins reassertion)
+- `exec: python -u main.py ...`
+
+If `effective: TASK_ADDRESS=<empty>`, either the hub is not pushing the value or a stale `.env` is setting it to an empty string. Check the hub-side `AddOnDeploymentConfig`:
+
+```bash
+# [Hub]
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|BLOCKCHAIN_RPC|STORAGE_BACKEND|value"
+```
+
+The startup wrapper also fails fast (exit code 2) with `ERROR: unsupported STORAGE_BACKEND=...` when the hub is misconfigured. That message is preferable to a Python stack trace later.
+
 ## Validate the Chart
 
 ```bash

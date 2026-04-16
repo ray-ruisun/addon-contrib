@@ -1,3 +1,14 @@
+{{- /*
+Optional Placement objects. Rendered only when the matching placement
+block is enabled. `gpu` selects clusters labeled `gpu=true`. `all`
+selects every remaining cluster in its clusterSet (and, when `gpu` is
+also enabled, explicitly excludes clusters with `gpu=true` so a cluster
+is only bound to one placement at a time).
+
+Each enabled placement is paired with a ManagedClusterSetBinding so the
+Placement can actually pick members from its clusterSet without extra
+manual setup on the hub.
+*/ -}}
 {{- if .Values.placement.gpu.enabled }}
 apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
@@ -13,6 +24,8 @@ metadata:
   name: {{ .Values.placement.gpu.name }}
   namespace: {{ .Values.addon.namespace }}
 spec:
+  clusterSets:
+    - {{ .Values.placement.gpu.clusterSet }}
   predicates:
     - requiredClusterSelector:
         labelSelector:

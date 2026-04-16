@@ -1,5 +1,28 @@
+{{- /*
+ClusterManagementAddOn is the top-level OCM object that advertises the
+addon to the hub. It declares:
+
+  * supportedConfigs - which config CRDs this addon accepts, plus the
+    default config/template a ManagedClusterAddOn will inherit when it
+    does not specify its own. The CPU AddOnTemplate and the CPU
+    AddOnDeploymentConfig are used as defaults so manual enable flows
+    pick them up automatically on non-GPU clusters.
+  * installStrategy  - one of:
+      - Manual      -> users enable the addon per-cluster with
+                       `make enable-addon CLUSTER=...`.
+      - Placements  -> the addon manager installs the addon on every
+                       cluster matched by the referenced Placements. At
+                       least one of placement.gpu/placement.all must be
+                       enabled in that mode.
+*/ -}}
 {{- if and (eq .Values.addon.installStrategy "Placements") (not (or .Values.placement.gpu.enabled .Values.placement.all.enabled)) }}
 {{- fail "addon.installStrategy=Placements requires enabling placement.gpu.enabled, placement.all.enabled, or both" }}
+{{- end }}
+{{- if not (has .Values.addon.installStrategy (list "Manual" "Placements")) }}
+{{- fail (printf "addon.installStrategy must be one of Manual|Placements, got %q" .Values.addon.installStrategy) }}
+{{- end }}
+{{- if not (has .Values.deploymentConfig.storage.backend (list "s3" "local" "nami")) }}
+{{- fail (printf "deploymentConfig.storage.backend must be one of s3|local|nami, got %q" .Values.deploymentConfig.storage.backend) }}
 {{- end }}
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ClusterManagementAddOn

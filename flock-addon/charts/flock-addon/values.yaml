@@ -1,25 +1,47 @@
-# Required by addon-contrib chart CI
+# -----------------------------------------------------------------------------
+# flock-addon Helm values
+#
+# This chart renders the hub-side OCM objects only (ClusterManagementAddOn,
+# AddOnTemplate, AddOnDeploymentConfig, and optional Placement bindings).
+# The managed-cluster workload (Namespace, ServiceAccount, Deployment) is
+# embedded inside each AddOnTemplate and delivered by the OCM addon manager.
+# -----------------------------------------------------------------------------
+
+# Container image for the flock-alliance-client workload. `tag` is rendered
+# verbatim into AddOnDeploymentConfig's FLOCK_ALLIANCE_IMAGE customized
+# variable. Prefer an immutable tag (release tag or short git SHA) in any
+# non-development environment instead of "latest".
 image:
   repository: ghcr.io/flock-io/fl-alliance-client
   tag: "latest"
   pullPolicy: Always
+  # Names of pre-created image pull Secrets in the agent namespace on the
+  # managed cluster. Leave empty for public images.
   pullSecrets: []
 
 agent:
+  # Namespace on each managed cluster where the addon's Namespace/Deployment
+  # objects are created. Matches spec.agentInstallNamespace on the
+  # AddOnDeploymentConfig.
   namespace: flock-system
   replicas: 1
   serviceAccountName: flock-agent
+  # Directory inside the container that receives the shared data volume.
+  # Node-local files at the mount source (hostPath or PVC) become visible
+  # here. Keep this aligned with deploymentConfig.runtime.flockAllianceEnvFile.
   dataPath: /data
   nodeSelector: {}
   tolerations: []
   affinity: {}
   gpuResource:
+    # Number of nvidia.com/gpu units requested/limited by the GPU variant.
     count: 1
+  # Volume that backs the in-container /data mount. Exactly one of the
+  # options below is used, evaluated in this precedence order:
+  #   1. existingClaim  -> bind a pre-created PVC
+  #   2. hostPath       -> absolute node path (do NOT use `~`)
+  #   3. emptyDir       -> ephemeral scratch (set both above to empty)
   dataVolume:
-    # Use one of:
-    # - existingClaim: bind a pre-created PVC
-    # - hostPath (default): absolute node path that includes .env + datasets (do not use ~)
-    # - emptyDir: set both existingClaim/hostPath empty (ephemeral)
     existingClaim: ""
     hostPath: "/data/flock-client"
   resources:
@@ -28,7 +50,7 @@ agent:
         cpu: 200m
         memory: 512Mi
       limits:
-        cpu: 2000m
+        cpu: "2"
         memory: 2Gi
 
 addon:
@@ -37,36 +59,63 @@ addon:
   displayName: FLock Addon
   description: |
     FLock addon deploys FLockAlliance as a direct client workload on managed
-    clusters. FLockAlliance handles blockchain/protocol orchestration and local
-    model execution.
+    clusters. FLockAlliance handles blockchain/protocol orchestration and
+    local model execution; training runs inside the same container process
+    via FLocKit, so no separate FLocKit addon workload is required.
+  # One of:
+  #   Manual      - enable per-cluster with `make enable-addon CLUSTER=...`
+  #   Placements  - auto-install on clusters matched by placement.gpu /
+  #                 placement.all (requires at least one of them enabled).
   installStrategy: Manual
 
+# AddOnDeploymentConfig shape. The chart renders two configs: the default
+# CPU one (named `deploymentConfig.name`) and a GPU variant (named
+# `deploymentConfig.gpuName`). The only field they differ in is USE_GPU.
 deploymentConfig:
   name: flock-addon-config
   gpuName: flock-addon-gpu-config
 
   blockchain:
-    # Shared testnet setting: set rpc/tokenAddress/taskAddress centrally via Helm.
-    # Per-cluster setting: leave empty and provide from each cluster's mounted .env.
+    # Shared testnet/local-chain behavior:
+    #   - leave these empty to let each managed cluster's .env provide them
+    #     (testnet mode)
+    #   - set them on the hub to override everywhere (hub-managed chain modes)
+    # See docs/deployment-modes.md for the full matrix.
     rpc: ""
     tokenAddress: ""
     taskAddress: ""
     stake: "0"
 
   training:
+    # "true" disables on-chain incentive submission; useful when running
+    # local-chain smoke tests without a funded signer.
     noIncentive: "false"
+    # Expected number of participants the local-chain coordinator should
+    # wait for before advancing rounds (local storage backend only).
     numParticipants: "1"
 
   runtime:
+    # USE_GPU value injected into the CPU AddOnDeploymentConfig. FLockAlliance
+    # reads this as `runtime.gpu` and decides whether to request CUDA.
     useGpu: "false"
+    # USE_GPU value injected into the GPU AddOnDeploymentConfig.
     gpuUseGpu: "true"
-    # Optional env file path mounted inside the Pod for FLockAlliance.
-    # Typical value when using the shared data volume: /data/.env
+    # Absolute path (inside the container) of the optional .env file that
+    # supplies per-node secrets such as PRIVATE_KEY and HF_TOKEN. Must live
+    # below agent.dataPath (default /data) so it resolves to a path inside
+    # the shared-data volume.
     flockAllianceEnvFile: "/data/.env"
 
   storage:
-    backend: "s3" # s3 | local | nami
+    # One of:
+    #   s3    - the original FLockAlliance signer-authenticated S3 workflow
+    #   local - local shared directory backend (rarely used outside tests)
+    #   nami  - direct S3-compatible backend for MinIO and similar stores
+    backend: "s3"
+    # Shared directory used by the `local` backend only.
     localSharedDir: "/data/shared"
+    # Settings consumed by the `nami` backend. All values flow straight into
+    # the FLockAlliance client through the AddOnDeploymentConfig.
     s3Compat:
       endpointUrl: ""
       bucket: ""
@@ -76,6 +125,10 @@ deploymentConfig:
       addressingStyle: "path"
       verifySsl: "false"
 
+# Optional Placement-based rollout. Only rendered when
+# `addon.installStrategy=Placements` AND at least one placement.* block is
+# enabled. The GPU placement matches clusters labeled `gpu=true`; the "all"
+# placement targets every other cluster in its ManagedClusterSet.
 placement:
   gpu:
     enabled: false
