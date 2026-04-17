@@ -72,6 +72,7 @@ Full mode details are in [Deployment Modes](docs/deployment-modes.md).
 - [Image Management](docs/image-management.md) - choose public/private images and publish custom builds
 - [Configuration and Overrides](docs/configuration-and-overrides.md) - runtime model, path rules, task updates, and per-cluster overrides
 - [Troubleshooting](docs/troubleshooting.md) - image pull, OCM distribution, GPU mapping, and log collection
+- [Tests](tests/README.md) - chart unit tests and entrypoint shell tests that gate every change
 
 ## Related Projects
 

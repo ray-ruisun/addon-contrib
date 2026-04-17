@@ -7,10 +7,17 @@
 KUBECTL ?= kubectl
 HELM ?= helm
 DOCKER ?= docker
+BATS ?= bats
 
 NAMESPACE ?= open-cluster-management
 RELEASE_NAME ?= flock-addon
 CHART_PATH ?= charts/flock-addon
+
+# Test fixture locations. Both directories are checked in and discoverable
+# by the test runners (helm-unittest auto-discovers `<chart>/tests/*_test.yaml`,
+# bats picks up every *.bats below tests/entrypoint/).
+TESTS_CHART_DIR ?= $(CHART_PATH)/tests
+TESTS_ENTRYPOINT_DIR ?= tests/entrypoint
 
 # FLOCK_ALLIANCE_IMAGE is the single source of truth for the workload image.
 # When callers override it (e.g. with a privately mirrored repo), the deploy
@@ -401,7 +408,7 @@ status: ## Print addon-related objects (hub-side)
 # FL-Alliance-Client repository — but the targets MUST exist or CI fails.
 
 .PHONY: verify
-verify: lint template ## Verify chart by running helm lint and a template render
+verify: lint template test-unit test-integration ## Run the full offline gate: lint, template render, chart unit tests, entrypoint shell tests
 	@echo "[flock-addon] verify complete"
 
 .PHONY: vendor
@@ -412,21 +419,43 @@ vendor: ## No-op vendor target (Helm-only addon)
 build: ## No-op build target (Helm-only addon; images are built in source repositories)
 	@echo "[flock-addon] no build required"
 
+# Chart unit tests run helm-unittest against the rendered manifests so any
+# change to a template, value, or fail-guard is caught before deployment.
+# We probe for the plugin first because addon-contrib CI installs it on
+# demand; printing the install command keeps local-dev parity with CI.
 .PHONY: test-unit
-test-unit: ## No-op unit tests (Helm-only addon)
-	@echo "[flock-addon] no unit tests"
+test-unit: ## Chart unit tests via helm-unittest (covers all template branches and fail-guards)
+	@if ! $(HELM) plugin list 2>/dev/null | awk '{print $$1}' | grep -qx unittest; then \
+		echo "[flock-addon] helm-unittest plugin missing; install with:" >&2; \
+		echo "    $(HELM) plugin install https://github.com/helm-unittest/helm-unittest" >&2; \
+		exit 1; \
+	fi
+	$(HELM) unittest $(CHART_PATH)
 
+# Integration tests exercise the embedded entrypoint script with bats.
+# They extract the script from a fresh `helm template`, replace `exec` with
+# a printf so argv can be captured, and assert hub-vs-.env precedence,
+# storage-backend guards, and the python argv shape — none of which need
+# a real cluster.
 .PHONY: test-integration
-test-integration: ## No-op integration tests (Helm-only addon)
-	@echo "[flock-addon] no integration tests"
+test-integration: ## Entrypoint shell tests via bats (hub-vs-.env precedence, storage guards, argv shape)
+	@command -v $(BATS) >/dev/null 2>&1 || { \
+		echo "[flock-addon] bats not found; install with:" >&2; \
+		echo "    macOS:  brew install bats-core" >&2; \
+		echo "    Linux:  apt-get install bats   (or build from https://github.com/bats-core/bats-core)" >&2; \
+		exit 1; \
+	}
+	@HELM=$(HELM) $(BATS) $(TESTS_ENTRYPOINT_DIR)
 
+# e2e tests require a live OCM hub and at least one managed cluster, so
+# they live outside the offline `verify` chain. The slot is kept so CI
+# can opt in once a kind-based fixture is added.
 .PHONY: test-e2e
-test-e2e: ## No-op e2e tests (Helm-only addon)
-	@echo "[flock-addon] no e2e tests"
+test-e2e: ## No-op e2e tests (would require a live OCM hub; see tests/README.md for the design)
+	@echo "[flock-addon] no e2e tests yet; see tests/README.md"
 
 .PHONY: test-chart
-test-chart: ## Helm chart validation used by CI
-	$(HELM) lint $(CHART_PATH)
+test-chart: lint test-unit ## Helm chart validation used by CI: lint + chart unit tests
 
 .PHONY: image
 image: ## No-op image target; images are built in source repositories
