@@ -1,11 +1,21 @@
 {{- /*
-Each enabled Placement is paired with a ManagedClusterSetBinding in the same
-namespace because OCM Placements can only select clusters from ClusterSets
-that are bound to the Placement's namespace. Without the binding the
-Placement is technically valid but always returns zero decisions, which
-silently breaks the Placements installStrategy. Rendering both objects
-together makes the chart self-contained: operators do not need to remember
-to create the binding by hand on the hub.
+-----------------------------------------------------------------------------
+Placement + ManagedClusterSetBinding
+-----------------------------------------------------------------------------
+Each enabled Placement is paired with a ManagedClusterSetBinding in the
+same namespace because OCM Placements can only select clusters from
+ClusterSets that are bound to the Placement's namespace. Without the
+binding the Placement is technically valid but always returns zero
+decisions, which silently breaks the Placements installStrategy. Rendering
+both objects together makes the chart self-contained: operators do not
+need to remember to create the binding by hand on the hub.
+-----------------------------------------------------------------------------
+*/ -}}
+
+{{- /*
+-----------------------------------------------------------------------------
+GPU placement (selects gpu=true)
+-----------------------------------------------------------------------------
 */ -}}
 {{- if .Values.placement.gpu.enabled }}
 apiVersion: cluster.open-cluster-management.io/v1beta2
@@ -30,6 +40,12 @@ spec:
           matchLabels:
             gpu: "true"
 {{- end }}
+
+{{- /*
+-----------------------------------------------------------------------------
+All-clusters placement (excludes gpu=true when GPU placement is also enabled)
+-----------------------------------------------------------------------------
+*/ -}}
 {{- if .Values.placement.all.enabled }}
 {{- if .Values.placement.gpu.enabled }}
 ---

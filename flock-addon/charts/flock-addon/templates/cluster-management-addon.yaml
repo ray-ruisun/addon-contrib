@@ -1,4 +1,12 @@
 {{- /*
+-----------------------------------------------------------------------------
+ClusterManagementAddOn
+-----------------------------------------------------------------------------
+The hub-side declaration of the addon: identity, lifecycle owner, supported
+config CRDs (with defaults), and install strategy. OCM's addon-manager
+controller picks this up via the lifecycle annotation and reconciles per-
+managed-cluster ManagedClusterAddOn objects accordingly.
+
 Three guard clauses run before any object is rendered. They all use Helm's
 `fail` builtin so misconfiguration aborts at template time with a clear
 message instead of producing a manifest the API server will later reject
@@ -16,6 +24,7 @@ with a less actionable error.
   3. storage.backend is consumed only by the entrypoint script, so an
      invalid value would currently fail at Pod start with a generic
      message. Validating here gives the operator immediate feedback.
+-----------------------------------------------------------------------------
 */ -}}
 {{- if and (eq .Values.addon.installStrategy "Placements") (not (or .Values.placement.gpu.enabled .Values.placement.all.enabled)) }}
 {{- fail "addon.installStrategy=Placements requires enabling placement.gpu.enabled, placement.all.enabled, or both" }}
@@ -40,13 +49,16 @@ spec:
   addOnMeta:
     displayName: {{ .Values.addon.displayName }}
     description: {{ .Values.addon.description | quote }}
-  # supportedConfigs declares the CRDs this addon accepts AND the defaults
-  # a ManagedClusterAddOn inherits when it does not override them itself.
-  # The CPU AddOnTemplate and CPU AddOnDeploymentConfig are listed as
-  # defaults so `make enable-addon` against an unlabelled cluster picks up
-  # the CPU variant automatically; clusters labelled gpu=true override
-  # both via the per-cluster ManagedClusterAddOn.spec.configs that the
-  # Makefile produces.
+  # ---------------------------------------------------------------------------
+  # Supported configs / defaults
+  #
+  # Declares the CRDs this addon accepts AND the defaults a
+  # ManagedClusterAddOn inherits when it does not override them itself. The
+  # CPU AddOnTemplate and CPU AddOnDeploymentConfig are listed as defaults
+  # so `make enable-addon` against an unlabelled cluster picks up the CPU
+  # variant automatically; clusters labelled gpu=true override both via the
+  # per-cluster ManagedClusterAddOn.spec.configs that the Makefile produces.
+  # ---------------------------------------------------------------------------
   supportedConfigs:
     - group: addon.open-cluster-management.io
       resource: addontemplates
@@ -57,6 +69,9 @@ spec:
       defaultConfig:
         name: {{ .Values.deploymentConfig.name }}
         namespace: {{ .Values.addon.namespace }}
+  # ---------------------------------------------------------------------------
+  # Install strategy
+  # ---------------------------------------------------------------------------
   installStrategy:
     type: {{ .Values.addon.installStrategy }}
     {{- if eq .Values.addon.installStrategy "Placements" }}

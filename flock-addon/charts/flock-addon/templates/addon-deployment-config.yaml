@@ -1,4 +1,7 @@
 {{- /*
+-----------------------------------------------------------------------------
+AddOnDeploymentConfig (CPU + GPU variants)
+-----------------------------------------------------------------------------
 Two AddOnDeploymentConfig variants are rendered from a shared spec list so
 the GPU and CPU paths can never drift in any field other than USE_GPU.
 USE_GPU is the only field that legitimately differs between the variants
@@ -9,10 +12,11 @@ must be identical across both variants.
 OCM merges customizedVariables from the chart-level AddOnDeploymentConfig
 with the per-cluster ManagedClusterAddOn.spec.configs: per-cluster values
 win when both are set. We therefore intentionally render variables here
-even when they are empty strings so that the substitution placeholders
-in the AddOnTemplate (`{{S3_COMPAT_BUCKET}}` etc.) always resolve to a
-valid env value rather than being left as literal "{{S3_COMPAT_BUCKET}}"
+even when they are empty strings so that the substitution placeholders in
+the AddOnTemplate (double-brace-S3_COMPAT_BUCKET-double-brace etc.) always
+resolve to a valid env value rather than being left as a literal placeholder
 in the Pod spec.
+-----------------------------------------------------------------------------
 */ -}}
 {{- $variants := list
     (dict "name" .Values.deploymentConfig.name    "useGpu" .Values.deploymentConfig.runtime.useGpu)
@@ -30,12 +34,18 @@ metadata:
 spec:
   agentInstallNamespace: {{ $.Values.agent.namespace }}
   customizedVariables:
+    # -------------------------------------------------------------------------
+    # Image + filesystem layout
+    # -------------------------------------------------------------------------
     - name: FLOCK_ALLIANCE_IMAGE
       value: {{ include "flock-addon.flockAllianceImage" $ | quote }}
     - name: DATA_PATH
       value: {{ $.Values.agent.dataPath | quote }}
     - name: HOST_DATA_PATH
       value: {{ $.Values.agent.dataVolume.hostPath | quote }}
+    # -------------------------------------------------------------------------
+    # Blockchain (hub-pushed; entrypoint enforces hub-wins-when-non-empty)
+    # -------------------------------------------------------------------------
     - name: BLOCKCHAIN_RPC
       value: {{ $.Values.deploymentConfig.blockchain.rpc | quote }}
     - name: TOKEN_ADDRESS
@@ -44,6 +54,9 @@ spec:
       value: {{ $.Values.deploymentConfig.blockchain.taskAddress | quote }}
     - name: STAKE
       value: {{ $.Values.deploymentConfig.blockchain.stake | quote }}
+    # -------------------------------------------------------------------------
+    # Storage backend selection + S3-compat parameters (nami backend)
+    # -------------------------------------------------------------------------
     - name: STORAGE_BACKEND
       value: {{ $.Values.deploymentConfig.storage.backend | quote }}
     - name: LOCAL_STORAGE_DIR
@@ -62,6 +75,9 @@ spec:
       value: {{ $.Values.deploymentConfig.storage.s3Compat.addressingStyle | quote }}
     - name: S3_COMPAT_VERIFY_SSL
       value: {{ $.Values.deploymentConfig.storage.s3Compat.verifySsl | quote }}
+    # -------------------------------------------------------------------------
+    # Runtime + training (USE_GPU is the only field that differs across variants)
+    # -------------------------------------------------------------------------
     - name: USE_GPU
       value: {{ $variant.useGpu | quote }}
     - name: FLOCK_ALLIANCE_ENV_FILE
