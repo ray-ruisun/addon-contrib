@@ -1,21 +1,24 @@
 {{- /*
-Chart-wide helpers.
-
-  flock-addon.flockAllianceImage  - "repository:tag" string used as the value
-                                    of the FLOCK_ALLIANCE_IMAGE customized
-                                    variable on both AddOnDeploymentConfig
-                                    objects.
-  flock-addon.templateName        - name of the CPU AddOnTemplate. Also used
-                                    as the default ClusterManagementAddOn
-                                    supportedConfigs template name.
-  flock-addon.gpuTemplateName     - name of the GPU AddOnTemplate, i.e.
-                                    "<addon>-gpu".
+flock-addon.flockAllianceImage renders the value injected into each
+AddOnDeploymentConfig's FLOCK_ALLIANCE_IMAGE customizedVariable. The
+AddOnTemplate references that variable verbatim as the container `image`
+field, so any change to the image rendering format MUST stay compatible
+with `repository:tag` shape — the template does not parse it further.
 */ -}}
-
 {{- define "flock-addon.flockAllianceImage" -}}
 {{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
 {{- end -}}
 
+{{- /*
+flock-addon.templateName / flock-addon.gpuTemplateName own the AddOnTemplate
+naming convention. The CPU template name is also referenced as the default
+in ClusterManagementAddOn.spec.supportedConfigs and by the GPU/CPU dispatch
+in `make enable-addon`, so both names must stay stable across releases.
+The "-gpu" suffix is hard-coded here (not a value) because the dispatcher
+in the Makefile encodes the same suffix; keeping the convention in one
+place would require teaching the Makefile how to read Helm values, which
+is not worth the indirection.
+*/ -}}
 {{- define "flock-addon.templateName" -}}
 {{- .Values.addon.name -}}
 {{- end -}}

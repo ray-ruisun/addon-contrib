@@ -1,33 +1,23 @@
-# -----------------------------------------------------------------------------
-# flock-addon Makefile
-#
-# Entry points are grouped into sections:
-#
-#   Deployment       - user-facing `make deploy-*`, `make update-task`,
-#                      `make undeploy`, `make enable-addon`, `make disable-addon`
-#   CI Targets       - contract with the addon-contrib CI pipeline (verify,
-#                      build, test-unit, test-integration, test-e2e, test-chart)
-#   Development      - `make lint`, `make template`, `make status`
-#   Help             - `make help`
-#
-# The deploy flow delegates to Helm. Internal `_deploy-*` targets are
-# composition helpers; they are exposed with an underscore prefix to signal
-# that end users should run the public `deploy-*` wrappers instead.
-# -----------------------------------------------------------------------------
-
-# Tool binaries (override with DOCKER='sudo docker' when the current user has
-# no docker group membership, etc.).
+# Tool binaries are kept overrideable so the same recipes work on hosts that
+# require `sudo docker` (no rootless setup, no docker group), inside CI where
+# helm/kubectl come from a custom path, and during local dev where the user
+# may want to point at kind/k3d-vended versions. CHAIN_DOCKER_COMPOSE below
+# inspects the first word of $(DOCKER) to detect the sudo case, so callers
+# MUST keep the `sudo docker` form (not `docker sudo`, not aliases).
 KUBECTL ?= kubectl
 HELM ?= helm
 DOCKER ?= docker
 
-# OCM + chart configuration.
 NAMESPACE ?= open-cluster-management
 RELEASE_NAME ?= flock-addon
 CHART_PATH ?= charts/flock-addon
 
-# Image coordinates. FLOCK_ALLIANCE_IMAGE wins over the four IMAGE_* components
-# when all are set, because the Makefile splits it at the final ':' via `cut`.
+# FLOCK_ALLIANCE_IMAGE is the single source of truth for the workload image.
+# When callers override it (e.g. with a privately mirrored repo), the deploy
+# recipes split it back into image.repository / image.tag for Helm using
+# `rev | cut -d: -f1`. We split at the LAST colon — using `cut -d: -f1`
+# without `rev` would mis-split values like `registry.local:5000/foo:tag`,
+# which is the exact reason rev/cut/rev is used everywhere image=... appears.
 IMAGE_REGISTRY ?= ghcr.io
 IMAGE_OWNER ?= flock-io
 IMAGE_NAME ?= fl-alliance-client
@@ -36,20 +26,30 @@ IMAGE_PULL_POLICY ?= Always
 FLOCK_ALLIANCE_IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_OWNER)/$(IMAGE_NAME):$(IMAGE_TAG)
 IMAGE_PULL_SECRET ?=
 
-# External dependencies (only used by the hub-managed local-chain modes).
+# These four are required only by the hub-managed local-chain deploy recipes
+# (deploy-local-chain-s3*). They intentionally have no defaults so the recipes
+# can `$(error ...)` with an actionable message instead of silently pointing
+# at a non-existent path or contacting the wrong RPC host.
 FL_ALLIANCE_CLIENT_DIR ?=
 MODEL_ARCHIVE ?=
 MODEL_HASH ?=
 RPC_HOST ?=
 
-# When DOCKER='sudo docker', forward the sudo prefix (and -E to preserve env)
-# to the Compose subcommand. Otherwise use `<DOCKER> compose`. This is what
-# `make chain` inside FL-Alliance-Client consumes via DOCKER_COMPOSE=.
+# When DOCKER='sudo docker', `make chain` in FL-Alliance-Client must invoke
+# `sudo -E docker compose ...` (note `-E`: the chain target reads variables
+# like MODEL_DEFINITION_HASH from the environment, which sudo strips by
+# default). When DOCKER='docker', plain `docker compose` is enough. We
+# detect by checking whether the first word of $(DOCKER) is `sudo`.
 CHAIN_DOCKER_COMPOSE ?= $(if $(filter sudo,$(word 1,$(DOCKER))),sudo -E $(wordlist 2,$(words $(DOCKER)),$(DOCKER)) compose,$(DOCKER) compose)
 
-# Local S3-compatible storage defaults (used only in the local-chain + nami
-# mode). These flow into Helm via `_deploy-local-chain-s3-compatible` and into
-# the MinIO container launched by `start-local-s3-compatible`.
+# Defaults for the hub-managed MinIO instance backing the `nami` storage
+# backend in the deploy-local-chain-s3-compatible flow. They are deliberately
+# insecure (minioadmin/minioadmin) because this mode targets a single-node
+# dev hub on a trusted network; production deployments must override
+# S3_COMPAT_ACCESS_KEY/S3_COMPAT_SECRET_KEY (and ideally point at a real
+# object store via _deploy-local-chain-s3-compatible). The container is
+# bound to host-network ports so managed clusters can reach it as
+# http://<RPC_HOST>:$(S3_COMPAT_PORT).
 MINIO_IMAGE ?= quay.io/minio/minio
 MINIO_MC_IMAGE ?= quay.io/minio/mc
 S3_COMPAT_CONTAINER_NAME ?= flock-minio
@@ -63,8 +63,10 @@ S3_COMPAT_REGION ?= us-east-1
 S3_COMPAT_ADDRESSING_STYLE ?= path
 S3_COMPAT_VERIFY_SSL ?= false
 
-# Optional managed-cluster pull secret name (e.g. for private GHCR). Only
-# injected when non-empty so the default render stays clean.
+# Helm rejects an empty entry inside the pullSecrets list (it would render a
+# Pod with `imagePullSecrets: [{name: ""}]`, which fails admission). Only
+# emit the --set flag when the user actually supplied a Secret name; this
+# keeps the default render valid for users on public registries.
 ifneq ($(strip $(IMAGE_PULL_SECRET)),)
 IMAGE_PULL_SECRET_ARG := --set image.pullSecrets[0]='$(IMAGE_PULL_SECRET)'
 endif
@@ -73,6 +75,12 @@ endif
 all: help
 
 ##@ Deployment
+
+# Public deploy targets are thin wrappers over `helm upgrade --install`. The
+# `_deploy-*` siblings below are intentionally underscored: they assume their
+# inputs are already validated and are reused by the deploy-local-chain-*
+# targets after those have done the chain bootstrap. End users should never
+# call the underscored variants directly.
 
 .PHONY: deploy-testnet
 deploy-testnet: ## Deploy addon for testnet mode (usage: make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...])
@@ -134,6 +142,12 @@ endif
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
 		--set deploymentConfig.storage.backend='s3'
 
+# The readiness loop below uses `mc ready` (not a fixed sleep) because MinIO
+# cold-start time varies wildly between SSD and rotational backing stores.
+# `mc ready` polls /minio/health/ready, which only succeeds once MinIO has
+# finished initialising disks and elected its quorum — a stronger guarantee
+# than /minio/health/live. The 30-second cap is generous enough for the
+# slowest disks we have observed in CI but still fails fast on misconfig.
 .PHONY: start-local-s3-compatible
 start-local-s3-compatible: ## Start a local MinIO instance on the hub and ensure the bucket exists
 	@set -euo pipefail; \
@@ -152,8 +166,6 @@ start-local-s3-compatible: ## Start a local MinIO instance on the hub and ensure
 		-v '$(S3_COMPAT_DATA_DIR):/data' \
 		'$(MINIO_IMAGE)' server /data --console-address ":9001" >/dev/null; \
 	echo "[flock-addon] MinIO listening at http://127.0.0.1:$(S3_COMPAT_PORT) (console http://127.0.0.1:$(S3_COMPAT_CONSOLE_PORT))"; \
-	# Wait until the MinIO /minio/health/ready endpoint succeeds (up to 30s) before
-	# attempting bucket provisioning, rather than relying on a fixed sleep.
 	for i in $$(seq 1 30); do \
 		if $(DOCKER) run --rm --network host --entrypoint /bin/sh '$(MINIO_MC_IMAGE)' -ec \
 			'mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && mc ready local >/dev/null 2>&1'; then \
@@ -182,6 +194,10 @@ stop-local-s3-compatible: ## Stop and remove the local MinIO container (leaves d
 		echo "[flock-addon] no container named $(S3_COMPAT_CONTAINER_NAME); nothing to do"; \
 	fi
 
+# `make chain` in FL-Alliance-Client deploys FlockToken/FlockTask and writes
+# their addresses to data/contracts.json. We parse that JSON with python3
+# (already required as a runtime dependency of FL-Alliance-Client) instead
+# of jq to avoid pulling another tool onto the hub host.
 .PHONY: deploy-local-chain-s3
 deploy-local-chain-s3: ## Auto-start local chain on the Hub using a pre-uploaded MODEL_HASH, then deploy the addon with the original signer-based S3 storage
 ifndef FL_ALLIANCE_CLIENT_DIR
@@ -220,6 +236,11 @@ endif
 		TOKEN_ADDRESS="$$TOKEN_ADDRESS" \
 		TASK_ADDRESS="$$TASK_ADDRESS"
 
+# The model's sha256 doubles as the on-chain MODEL_DEFINITION_HASH and as
+# the S3 object key. Computing it once locally keeps the upload step and
+# the `make chain` step in agreement on the same identifier without an
+# extra RPC round-trip. The model directory is bind-mounted read-only so
+# `mc cp` cannot accidentally mutate the operator's source artefacts.
 .PHONY: deploy-local-chain-s3-compatible
 deploy-local-chain-s3-compatible: ## Auto-start local chain + local S3-compatible storage on the Hub, upload MODEL_ARCHIVE, then deploy the addon
 ifndef FL_ALLIANCE_CLIENT_DIR
@@ -281,6 +302,10 @@ endif
 		S3_COMPAT_ADDRESSING_STYLE='$(S3_COMPAT_ADDRESSING_STYLE)' \
 		S3_COMPAT_VERIFY_SSL='$(S3_COMPAT_VERIFY_SSL)'
 
+# `--reuse-values` keeps every other field at its current rendered value so
+# operators can rotate task addresses without re-supplying RPC, image, or
+# storage settings. Each managed cluster picks the new value up on its next
+# AddOnDeploymentConfig reconcile (see docs/troubleshooting.md for force-rollout).
 .PHONY: update-task
 update-task: ## Update the shared task address only (usage: make update-task TASK_ADDRESS=0x...)
 ifndef TASK_ADDRESS
@@ -290,6 +315,10 @@ endif
 		--reuse-values \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)'
 
+# OCM's addon-manager owns the per-cluster Namespace/Deployment objects via
+# the AddOnTemplate; deleting the hub-side ClusterManagementAddOn is what
+# triggers GC on the managed clusters. `|| true` keeps idempotency on
+# repeated invocations after a successful uninstall.
 .PHONY: undeploy
 undeploy: ## Remove the FLock addon Helm release (managed cluster workloads are garbage-collected by OCM)
 	@echo "[flock-addon] uninstalling Helm release $(RELEASE_NAME)"
@@ -298,6 +327,14 @@ undeploy: ## Remove the FLock addon Helm release (managed cluster workloads are 
 .PHONY: undeploy-all
 undeploy-all: undeploy stop-local-s3-compatible ## Full local cleanup: helm uninstall + stop local MinIO container
 
+# This recipe builds the ManagedClusterAddOn manifest with `printf '%s\n'`
+# rather than a heredoc. Heredocs in Make recipes are fragile because each
+# backslash-newline turns the recipe into a single shell line: the heredoc
+# terminator ends up on the same physical line as the body and the shell
+# tries to interpret subsequent words as filenames. `printf` with one line
+# per argument keeps every output line independent and pipes cleanly to
+# `kubectl apply -f -`. The GPU label dispatch tolerates missing labels so
+# unlabelled clusters fall through to the CPU variant.
 .PHONY: enable-addon
 enable-addon: ## Enable the addon on a managed cluster; auto-selects GPU/CPU template via managedcluster label `gpu=true` (override with CONFIG=/TEMPLATE=)
 ifndef CLUSTER
@@ -356,6 +393,13 @@ status: ## Print addon-related objects (hub-side)
 
 ##@ CI Targets
 
+# The targets in this section satisfy the contract that addon-contrib's CI
+# pipeline expects from every addon under this repo: verify, vendor, build,
+# test-unit, test-integration, test-e2e, test-chart, image, image-push,
+# image-manifest. Most are no-ops for this addon because we ship a Helm chart
+# only — the actual container image is built and published from the
+# FL-Alliance-Client repository — but the targets MUST exist or CI fails.
+
 .PHONY: verify
 verify: lint template ## Verify chart by running helm lint and a template render
 	@echo "[flock-addon] verify complete"
@@ -402,6 +446,11 @@ image-manifest: ## No-op multi-arch manifest target
 lint: ## Lint the Helm chart
 	$(HELM) lint $(CHART_PATH)
 
+# Render twice: the default (Manual install strategy, no Placements) and the
+# Placements path with both placements enabled. Together they exercise every
+# conditional branch in the chart, so a template-only smoke test catches typos
+# that helm lint alone would miss (e.g. a misnamed value referenced only
+# inside `if .Values.placement.gpu.enabled`).
 .PHONY: template
 template: ## Render templates locally (useful for diffing across modes)
 	@$(HELM) template $(RELEASE_NAME) $(CHART_PATH) >/dev/null

@@ -1,13 +1,18 @@
 {{- /*
-Two AddOnDeploymentConfig objects are rendered:
+Two AddOnDeploymentConfig variants are rendered from a shared spec list so
+the GPU and CPU paths can never drift in any field other than USE_GPU.
+USE_GPU is the only field that legitimately differs between the variants
+because the AddOnTemplate consults it (via `runtime.gpu`) to decide whether
+to load the CUDA backend; every other variable is fleet-wide config that
+must be identical across both variants.
 
-  * {{ .Values.deploymentConfig.name }}     - CPU variant, USE_GPU pulled from
-                                              deploymentConfig.runtime.useGpu
-  * {{ .Values.deploymentConfig.gpuName }}  - GPU variant, USE_GPU pulled from
-                                              deploymentConfig.runtime.gpuUseGpu
-
-All other customizedVariables are identical, so they are rendered through a
-shared list and a small range loop to avoid drift between the two variants.
+OCM merges customizedVariables from the chart-level AddOnDeploymentConfig
+with the per-cluster ManagedClusterAddOn.spec.configs: per-cluster values
+win when both are set. We therefore intentionally render variables here
+even when they are empty strings so that the substitution placeholders
+in the AddOnTemplate (`{{S3_COMPAT_BUCKET}}` etc.) always resolve to a
+valid env value rather than being left as literal "{{S3_COMPAT_BUCKET}}"
+in the Pod spec.
 */ -}}
 {{- $variants := list
     (dict "name" .Values.deploymentConfig.name    "useGpu" .Values.deploymentConfig.runtime.useGpu)

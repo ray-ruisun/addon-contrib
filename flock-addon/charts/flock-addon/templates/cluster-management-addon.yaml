@@ -1,19 +1,21 @@
 {{- /*
-ClusterManagementAddOn is the top-level OCM object that advertises the
-addon to the hub. It declares:
+Three guard clauses run before any object is rendered. They all use Helm's
+`fail` builtin so misconfiguration aborts at template time with a clear
+message instead of producing a manifest the API server will later reject
+with a less actionable error.
 
-  * supportedConfigs - which config CRDs this addon accepts, plus the
-    default config/template a ManagedClusterAddOn will inherit when it
-    does not specify its own. The CPU AddOnTemplate and the CPU
-    AddOnDeploymentConfig are used as defaults so manual enable flows
-    pick them up automatically on non-GPU clusters.
-  * installStrategy  - one of:
-      - Manual      -> users enable the addon per-cluster with
-                       `make enable-addon CLUSTER=...`.
-      - Placements  -> the addon manager installs the addon on every
-                       cluster matched by the referenced Placements. At
-                       least one of placement.gpu/placement.all must be
-                       enabled in that mode.
+  1. Placements strategy without any enabled Placement renders an OCM
+     ClusterManagementAddOn whose installStrategy.placements list is empty,
+     which OCM accepts but means "install nowhere" — almost certainly not
+     what the operator intended. Catching it at template time keeps
+     `make enable-addon` from being silently no-op.
+  2. installStrategy is open enum in OCM today; restricting it here keeps
+     the chart's mental model small (Manual or Placements) and prevents
+     typos like "Placement" (singular) from rendering an addon that OCM
+     simply ignores.
+  3. storage.backend is consumed only by the entrypoint script, so an
+     invalid value would currently fail at Pod start with a generic
+     message. Validating here gives the operator immediate feedback.
 */ -}}
 {{- if and (eq .Values.addon.installStrategy "Placements") (not (or .Values.placement.gpu.enabled .Values.placement.all.enabled)) }}
 {{- fail "addon.installStrategy=Placements requires enabling placement.gpu.enabled, placement.all.enabled, or both" }}
@@ -29,11 +31,22 @@ kind: ClusterManagementAddOn
 metadata:
   name: {{ .Values.addon.name }}
   annotations:
+    # Hand lifecycle to OCM's addon-manager controller. Without this
+    # annotation the addon-manager would refuse to act on the resource
+    # and operators would have to install agents manually on each
+    # cluster.
     addon.open-cluster-management.io/lifecycle: addon-manager
 spec:
   addOnMeta:
     displayName: {{ .Values.addon.displayName }}
     description: {{ .Values.addon.description | quote }}
+  # supportedConfigs declares the CRDs this addon accepts AND the defaults
+  # a ManagedClusterAddOn inherits when it does not override them itself.
+  # The CPU AddOnTemplate and CPU AddOnDeploymentConfig are listed as
+  # defaults so `make enable-addon` against an unlabelled cluster picks up
+  # the CPU variant automatically; clusters labelled gpu=true override
+  # both via the per-cluster ManagedClusterAddOn.spec.configs that the
+  # Makefile produces.
   supportedConfigs:
     - group: addon.open-cluster-management.io
       resource: addontemplates
@@ -47,6 +60,12 @@ spec:
   installStrategy:
     type: {{ .Values.addon.installStrategy }}
     {{- if eq .Values.addon.installStrategy "Placements" }}
+    # Each enabled placement is rendered independently so operators can
+    # target only the GPU placement (e.g. while bringing up a GPU pool)
+    # without also enabling the catch-all placement, or vice versa. The
+    # configs blocks override the supportedConfigs defaults above for
+    # whichever clusters fall into that placement; the GPU placement
+    # therefore points at the GPU template + GPU AddOnDeploymentConfig.
     placements:
       {{- if .Values.placement.gpu.enabled }}
       - name: {{ .Values.placement.gpu.name }}

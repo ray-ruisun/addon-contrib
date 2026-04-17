@@ -1,13 +1,11 @@
 {{- /*
-Optional Placement objects. Rendered only when the matching placement
-block is enabled. `gpu` selects clusters labeled `gpu=true`. `all`
-selects every remaining cluster in its clusterSet (and, when `gpu` is
-also enabled, explicitly excludes clusters with `gpu=true` so a cluster
-is only bound to one placement at a time).
-
-Each enabled placement is paired with a ManagedClusterSetBinding so the
-Placement can actually pick members from its clusterSet without extra
-manual setup on the hub.
+Each enabled Placement is paired with a ManagedClusterSetBinding in the same
+namespace because OCM Placements can only select clusters from ClusterSets
+that are bound to the Placement's namespace. Without the binding the
+Placement is technically valid but always returns zero decisions, which
+silently breaks the Placements installStrategy. Rendering both objects
+together makes the chart self-contained: operators do not need to remember
+to create the binding by hand on the hub.
 */ -}}
 {{- if .Values.placement.gpu.enabled }}
 apiVersion: cluster.open-cluster-management.io/v1beta2
@@ -53,6 +51,13 @@ spec:
   clusterSets:
     - {{ .Values.placement.all.clusterSet }}
   {{- if .Values.placement.gpu.enabled }}
+  # When the GPU placement is also enabled, exclude gpu=true clusters from
+  # this placement so the fleet partitions cleanly: each cluster is bound
+  # to exactly one placement and therefore receives exactly one
+  # AddOnDeploymentConfig variant. Without this NotIn selector, gpu=true
+  # clusters would match BOTH placements and OCM would arbitrarily pick
+  # one of the two AddOnTemplate references — usually causing the GPU
+  # variant to be replaced by the CPU variant on the next reconcile.
   predicates:
     - requiredClusterSelector:
         labelSelector:
