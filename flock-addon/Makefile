@@ -292,6 +292,18 @@ endif
 # stronger guarantee than /minio/health/live. The 30-second cap is
 # generous enough for the slowest disks we have observed in CI but still
 # fails fast on misconfig.
+#
+# Both stdout AND stderr from the per-attempt `mc alias set` and
+# `mc ready` calls are sunk to /dev/null. Reason: `mc alias set`
+# round-trips to the server to validate credentials, so during the
+# sub-second window where the docker port mapping is live but the MinIO
+# main process has not finished claiming the listener, mc emits a noisy
+# `connection reset by peer` to stderr on every retry. The error is
+# benign (the loop catches it and tries again on the next tick), but
+# leaking it to the operator's terminal looks like a deploy failure.
+# The genuine 30-second timeout branch dumps the container's last 40
+# log lines so we lose no diagnostic signal when something is really
+# wrong.
 # -----------------------------------------------------------------------------
 
 .PHONY: start-local-s3-compatible
@@ -314,7 +326,7 @@ start-local-s3-compatible: ## Start a local MinIO instance on the hub and ensure
 	echo "[flock-addon] MinIO listening at http://127.0.0.1:$(S3_COMPAT_PORT) (console http://127.0.0.1:$(S3_COMPAT_CONSOLE_PORT))"; \
 	for i in $$(seq 1 30); do \
 		if $(DOCKER) run --rm --network host --entrypoint /bin/sh '$(MINIO_MC_IMAGE)' -ec \
-			'mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && mc ready local >/dev/null 2>&1'; then \
+			'mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null 2>&1 && mc ready local >/dev/null 2>&1' >/dev/null 2>&1; then \
 			echo "[flock-addon] MinIO ready after $$i second(s)"; \
 			break; \
 		fi; \
