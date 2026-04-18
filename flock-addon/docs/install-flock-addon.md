@@ -297,6 +297,49 @@ Should see:
 - on `gpu=true` clusters, Pod resources show `request=1` and `limit=1` for `nvidia.com/gpu`
 - on CPU clusters, the GPU request fields are empty and the Pod still runs
 
+## Sizing for LLM Workloads
+
+The chart ships conservative defaults (`requests: 200m / 512Mi`, `limits: 2 cores / 2Gi`) so the Pod schedules on `kind`/`k3d` smoke clusters. Real LLM training (7B+ LoRA, MLX fine-tune, anything with a tokenizer warm-up bigger than a few hundred MB) blows past 2Gi instantly and the kubelet OOM-kills the container with exit code 137:
+
+```
+NAME                               READY   STATUS      RESTARTS      AGE
+pod/flock-agent-6879cf7f75-dhxf9   0/1     OOMKilled   3 (85s ago)   4m28s
+```
+
+Override per deploy with the `MEMORY_*` / `CPU_*` Make vars — they propagate to every `make deploy*` recipe and OCM auto-reconciles the running Pods:
+
+```bash
+# Example: 7B LoRA on GPU
+make deploy-local-chain-s3-compatible \
+  FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client \
+  MODEL_ARCHIVE=/path/to/model.tar.gz \
+  RPC_HOST=<hub-ip> \
+  DOCKER='sudo docker' \
+  MEMORY_REQUEST=8Gi MEMORY_LIMIT=24Gi \
+  CPU_REQUEST=2     CPU_LIMIT=4
+```
+
+Or, for a release that's already deployed, patch resources in place without touching anything else:
+
+```bash
+helm upgrade flock-addon charts/flock-addon \
+  --reuse-values \
+  --set agent.resources.flockAlliance.requests.memory=8Gi \
+  --set agent.resources.flockAlliance.limits.memory=24Gi
+```
+
+Sizing reference (host RAM only — VRAM is governed by the GPU template variant):
+
+| Workload | `MEMORY_REQUEST` | `MEMORY_LIMIT` | `CPU_REQUEST` | `CPU_LIMIT` |
+|----------|------------------|----------------|---------------|-------------|
+| 7B LoRA fine-tune on GPU  | `8Gi`  | `24Gi` | `2` | `4`  |
+| 13B LoRA fine-tune on GPU | `16Gi` | `48Gi` | `2` | `4`  |
+| 7B MLX fine-tune on CPU   | `24Gi` | `64Gi` | `4` | `16` |
+| 7B FP16 inference on GPU  | `4Gi`  | `16Gi` | `1` | `2`  |
+| 7B INT4 inference on CPU  | `6Gi`  | `12Gi` | `2` | `8`  |
+
+To dial in an unfamiliar model: set `MEMORY_LIMIT` to a deliberately oversized value (e.g. `128Gi`) for one run, then read the peak with `kubectl -n flock-system top pod` (or `cat /sys/fs/cgroup/.../memory.peak` on the node) and use `peak * 1.4` as the production limit, `peak * 0.7` as the request.
+
 ## Cleanup
 
 ```bash

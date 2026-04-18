@@ -91,19 +91,25 @@ agent:
 
   # ---------------------------------------------------------------------------
   # Container resources
+  #
+  # Defaults are sized for FLock's reference small-model workloads so the
+  # Pod stays schedulable on `kind`/`k3d`/single-node dev clusters out of
+  # the box. Real LLM training (7B+ LoRA, MLX fine-tune, anything with a
+  # multi-GB tokenizer warm-up) blows past 2Gi instantly and the kubelet
+  # OOM-kills the container with exit 137 — bump these before running such
+  # tasks. The Makefile exposes MEMORY_REQUEST/MEMORY_LIMIT/CPU_REQUEST/
+  # CPU_LIMIT for per-deploy overrides; the values below are the fallback.
+  #
+  # Sizing reference (host RAM only — VRAM is governed by the GPU variant):
+  #   7B  LoRA  on GPU : requests {cpu: 2,  memory: 8Gi}  limits {cpu: 4,  memory: 24Gi}
+  #   13B LoRA  on GPU : requests {cpu: 2,  memory: 16Gi} limits {cpu: 4,  memory: 48Gi}
+  #   7B  MLX   on CPU : requests {cpu: 4,  memory: 24Gi} limits {cpu: 16, memory: 64Gi}
   # ---------------------------------------------------------------------------
   resources:
     flockAlliance:
-      # 200m/512Mi keeps the Pod schedulable on most kind/k3d nodes while
-      # still giving FLockAlliance enough headroom for its background gRPC
-      # poll loop. Bump for production; FLockAlliance's actual training
-      # footprint is dominated by the model loaded at runtime.
       requests:
         cpu: 200m
         memory: 512Mi
-      # 2 cores / 2Gi is sized for FLock's reference small-model workloads.
-      # Increase for production training. Note: even on the GPU variant,
-      # most CPU work is concentrated in data preprocessing.
       limits:
         cpu: "2"
         memory: 2Gi

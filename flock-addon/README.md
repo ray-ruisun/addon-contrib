@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/flock-logo-full.svg" alt="FLock" width="320" />
+</p>
+
 # FLock Addon for Decentralized Federated AI
 
 Integrate [FLock FL Alliance](https://github.com/FLock-io/FL-Alliance-Client) (`FLockAlliance`) with Open Cluster Management (OCM) to automate decentralized federated learning across multi-cluster and multi-cloud environments, with blockchain-backed coordination and incentive mechanisms for participating nodes.

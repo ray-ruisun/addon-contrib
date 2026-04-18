@@ -153,6 +153,31 @@ MINIO_SECRET_KEY ?=
 MINIO_BUCKET ?=
 
 # -----------------------------------------------------------------------------
+# Per-deploy resource overrides (FLockAlliance container)
+#
+# values.yaml ships conservative defaults (2Gi limit / 512Mi request) sized
+# for FLock's small reference models so `kind`/`k3d` smoke tests fit on a
+# laptop. Real LLM workloads (7B+ LoRA, MLX fine-tune, anything with a
+# tokenizer warm-up bigger than a few hundred MB) blow past 2Gi instantly
+# and the kubelet OOM-kills the container with exit 137.
+#
+# Rather than baking large numbers into values.yaml — which would refuse to
+# schedule on small dev clusters — expose four optional Make vars. When set,
+# they emit `--set agent.resources.flockAlliance.{requests,limits}.{cpu,memory}`
+# below; when empty, values.yaml defaults win. This pattern matches the
+# IMAGE_PULL_SECRET_ARG approach a few lines down.
+#
+# Sizing examples (host RAM only — VRAM is governed by GPU_RESOURCE_*):
+#   7B LoRA  on GPU : MEMORY_REQUEST=8Gi  MEMORY_LIMIT=24Gi CPU_REQUEST=2 CPU_LIMIT=4
+#   13B LoRA on GPU : MEMORY_REQUEST=16Gi MEMORY_LIMIT=48Gi CPU_REQUEST=2 CPU_LIMIT=4
+#   7B MLX   on CPU : MEMORY_REQUEST=24Gi MEMORY_LIMIT=64Gi CPU_REQUEST=4 CPU_LIMIT=16
+# -----------------------------------------------------------------------------
+MEMORY_REQUEST ?=
+MEMORY_LIMIT ?=
+CPU_REQUEST ?=
+CPU_LIMIT ?=
+
+# -----------------------------------------------------------------------------
 # Conditional pull-secret injection
 #
 # Helm rejects an empty entry inside the pullSecrets list (it would render
@@ -162,6 +187,28 @@ MINIO_BUCKET ?=
 # -----------------------------------------------------------------------------
 ifneq ($(strip $(IMAGE_PULL_SECRET)),)
 IMAGE_PULL_SECRET_ARG := --set image.pullSecrets[0]='$(IMAGE_PULL_SECRET)'
+endif
+
+# -----------------------------------------------------------------------------
+# Conditional resource overrides
+#
+# Build up a single $(RESOURCE_OVERRIDES) string that every deploy recipe
+# splices in unconditionally. Each branch contributes nothing when its var
+# is empty so render output is byte-identical to the previous behaviour
+# unless the operator explicitly opts in.
+# -----------------------------------------------------------------------------
+RESOURCE_OVERRIDES :=
+ifneq ($(strip $(MEMORY_REQUEST)),)
+RESOURCE_OVERRIDES += --set agent.resources.flockAlliance.requests.memory='$(MEMORY_REQUEST)'
+endif
+ifneq ($(strip $(MEMORY_LIMIT)),)
+RESOURCE_OVERRIDES += --set agent.resources.flockAlliance.limits.memory='$(MEMORY_LIMIT)'
+endif
+ifneq ($(strip $(CPU_REQUEST)),)
+RESOURCE_OVERRIDES += --set agent.resources.flockAlliance.requests.cpu='$(CPU_REQUEST)'
+endif
+ifneq ($(strip $(CPU_LIMIT)),)
+RESOURCE_OVERRIDES += --set agent.resources.flockAlliance.limits.cpu='$(CPU_LIMIT)'
 endif
 
 .PHONY: all
@@ -220,7 +267,8 @@ deploy: ## Install the addon control plane on the hub with default values (enabl
 		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f2- | rev) \
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f1 | rev) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
-		$(IMAGE_PULL_SECRET_ARG)
+		$(IMAGE_PULL_SECRET_ARG) \
+		$(RESOURCE_OVERRIDES)
 
 .PHONY: deploy-testnet
 deploy-testnet: ## Deploy addon for testnet mode (usage: make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...])
@@ -235,6 +283,7 @@ endif
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f1 | rev) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
+		$(RESOURCE_OVERRIDES) \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
 		--set deploymentConfig.storage.backend='s3'
@@ -252,6 +301,7 @@ endif
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f1 | rev) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
+		$(RESOURCE_OVERRIDES) \
 		--set deploymentConfig.blockchain.rpc='$(RPC)' \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
@@ -277,6 +327,7 @@ endif
 		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f1 | rev) \
 		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
 		$(IMAGE_PULL_SECRET_ARG) \
+		$(RESOURCE_OVERRIDES) \
 		--set deploymentConfig.blockchain.rpc='$(RPC)' \
 		--set deploymentConfig.blockchain.tokenAddress='$(TOKEN_ADDRESS)' \
 		--set deploymentConfig.blockchain.taskAddress='$(TASK_ADDRESS)' \
