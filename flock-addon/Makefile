@@ -91,13 +91,34 @@ CHAIN_DOCKER_COMPOSE ?= $(if $(filter sudo,$(word 1,$(DOCKER))),sudo -E $(wordli
 # Local MinIO defaults (nami storage backend)
 #
 # These back the hub-managed MinIO instance used by the
-# deploy-local-chain-s3-compatible flow. They are deliberately insecure
-# (minioadmin/minioadmin) because this mode targets a single-node dev hub
-# on a trusted network; production deployments must override
-# S3_COMPAT_ACCESS_KEY/S3_COMPAT_SECRET_KEY (and ideally point at a real
-# object store via _deploy-local-chain-s3-compatible). The container is
-# bound to host-network ports so managed clusters can reach it as
+# deploy-local-chain-s3-compatible flow. The container is bound to
+# host-network ports so managed clusters can reach it as
 # http://<RPC_HOST>:$(S3_COMPAT_PORT).
+#
+# Credentials and bucket name are intentionally task-scoped:
+#
+#   * deploy-local-chain-s3-compatible generates a fresh access/secret pair
+#     (openssl rand) per invocation and passes them down to MinIO + the
+#     AddOnDeploymentConfig in lockstep. Every FL client on every managed
+#     cluster therefore receives the SAME credentials via OCM customizedVariable
+#     substitution — multi-client coordination is preserved exactly as before;
+#     only the value being propagated changes from the well-known
+#     `minioadmin/minioadmin` to a per-task random pair.
+#
+#   * The bucket name is derived from MODEL_HASH (`flock-task-<sha256[:12]>`),
+#     so concurrent tasks on the same hub never clobber each other's artifacts
+#     and `make undeploy-local-chain` can recycle a task's bucket without
+#     touching others.
+#
+# Operator-facing overrides (use either to pin known values, e.g. for CI):
+#   MINIO_ACCESS_KEY=... MINIO_SECRET_KEY=...  -> skip random generation
+#   MINIO_BUCKET=...                            -> skip MODEL_HASH derivation
+#
+# The S3_COMPAT_* variables below are still honored when running
+# `start-local-s3-compatible` standalone (e.g. for manual `mc cp` testing
+# from an operator laptop) — those defaults intentionally stay on the
+# legacy `minioadmin` values so quick smoke tests don't require a fresh
+# generation step.
 # -----------------------------------------------------------------------------
 MINIO_IMAGE ?= quay.io/minio/minio
 MINIO_MC_IMAGE ?= quay.io/minio/mc
@@ -111,6 +132,12 @@ S3_COMPAT_BUCKET ?= flock-dev
 S3_COMPAT_REGION ?= us-east-1
 S3_COMPAT_ADDRESSING_STYLE ?= path
 S3_COMPAT_VERIFY_SSL ?= false
+
+# Operator overrides for `make deploy-local-chain-s3-compatible`. Empty
+# defaults trigger random generation inside the recipe.
+MINIO_ACCESS_KEY ?=
+MINIO_SECRET_KEY ?=
+MINIO_BUCKET ?=
 
 # -----------------------------------------------------------------------------
 # Conditional pull-secret injection
@@ -345,7 +372,22 @@ endif
 	$(MAKE) _deploy-local-chain-s3 \
 		RPC='http://$(RPC_HOST):8545' \
 		TOKEN_ADDRESS="$$TOKEN_ADDRESS" \
-		TASK_ADDRESS="$$TASK_ADDRESS"
+		TASK_ADDRESS="$$TASK_ADDRESS"; \
+	echo ""; \
+	echo "============================================================"; \
+	echo "[flock-addon] local-chain + signer-S3 deployment complete"; \
+	echo "  TASK_ADDRESS  = $$TASK_ADDRESS"; \
+	echo "  TOKEN_ADDRESS = $$TOKEN_ADDRESS"; \
+	echo "  CHAIN_RPC     = http://$(RPC_HOST):8545"; \
+	echo "  STORAGE       = signer-authenticated S3 (FLock testnet)"; \
+	echo "  MODEL_HASH    = $(MODEL_HASH)"; \
+	echo "============================================================"; \
+	echo "Next steps:"; \
+	echo "  1. Enable the addon on each managed cluster:"; \
+	echo "       make enable-addon CLUSTER=<name>"; \
+	echo "  2. Tear everything down when the task is finished:"; \
+	echo "       make undeploy-local-chain FL_ALLIANCE_CLIENT_DIR='$(FL_ALLIANCE_CLIENT_DIR)'"; \
+	echo "============================================================"
 
 # -----------------------------------------------------------------------------
 # deploy-local-chain-s3-compatible
@@ -373,19 +415,34 @@ endif
 		echo "[flock-addon] ERROR: MODEL_ARCHIVE does not exist: $(MODEL_ARCHIVE)" >&2; \
 		exit 1; \
 	fi; \
+	if ! command -v openssl >/dev/null 2>&1; then \
+		echo "[flock-addon] ERROR: openssl is required to generate per-task MinIO credentials" >&2; \
+		exit 1; \
+	fi; \
 	MODEL_HASH=$$(sha256sum '$(MODEL_ARCHIVE)' | cut -d' ' -f1); \
 	MODEL_DIR=$$(cd "$$(dirname '$(MODEL_ARCHIVE)')" && pwd); \
 	MODEL_BASENAME=$$(basename '$(MODEL_ARCHIVE)'); \
 	S3_ENDPOINT='http://$(RPC_HOST):$(S3_COMPAT_PORT)'; \
+	ACCESS_KEY='$(MINIO_ACCESS_KEY)'; [ -n "$$ACCESS_KEY" ] || ACCESS_KEY=$$(openssl rand -hex 12); \
+	SECRET_KEY='$(MINIO_SECRET_KEY)'; [ -n "$$SECRET_KEY" ] || SECRET_KEY=$$(openssl rand -hex 24); \
+	BUCKET='$(MINIO_BUCKET)'; [ -n "$$BUCKET" ] || BUCKET=flock-task-$$(echo "$$MODEL_HASH" | cut -c1-12); \
 	echo "[flock-addon] MODEL_HASH=$$MODEL_HASH"; \
-	$(MAKE) start-local-s3-compatible; \
-	echo "[flock-addon] uploading $(MODEL_ARCHIVE) to bucket $(S3_COMPAT_BUCKET) with key $$MODEL_HASH"; \
+	echo "[flock-addon] task-scoped bucket: $$BUCKET"; \
+	echo "[flock-addon] task-scoped MinIO credentials: ACCESS_KEY=$$ACCESS_KEY (SECRET_KEY hidden; use 'make minio-credentials' to fetch)"; \
+	$(MAKE) start-local-s3-compatible \
+		S3_COMPAT_ACCESS_KEY="$$ACCESS_KEY" \
+		S3_COMPAT_SECRET_KEY="$$SECRET_KEY" \
+		S3_COMPAT_BUCKET="$$BUCKET"; \
+	echo "[flock-addon] uploading $(MODEL_ARCHIVE) to bucket $$BUCKET with key $$MODEL_HASH"; \
 	$(DOCKER) run --rm --network host --entrypoint /bin/sh \
 		-e MODEL_BASENAME="$$MODEL_BASENAME" \
 		-e MODEL_HASH="$$MODEL_HASH" \
+		-e BUCKET="$$BUCKET" \
+		-e ACCESS_KEY="$$ACCESS_KEY" \
+		-e SECRET_KEY="$$SECRET_KEY" \
 		-v "$$MODEL_DIR:/upload:ro" '$(MINIO_MC_IMAGE)' -ec '\
-		mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$(S3_COMPAT_ACCESS_KEY)" "$(S3_COMPAT_SECRET_KEY)" >/dev/null && \
-		mc cp "/upload/$${MODEL_BASENAME}" "local/$(S3_COMPAT_BUCKET)/$${MODEL_HASH}" >/dev/null'; \
+		mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$$ACCESS_KEY" "$$SECRET_KEY" >/dev/null && \
+		mc cp "/upload/$${MODEL_BASENAME}" "local/$${BUCKET}/$${MODEL_HASH}" >/dev/null'; \
 	$(MAKE) -C '$(FL_ALLIANCE_CLIENT_DIR)' chain \
 		$(if $(strip $(CHAIN_DOCKER_COMPOSE)),DOCKER_COMPOSE='$(CHAIN_DOCKER_COMPOSE)') \
 		MODEL_DEFINITION_HASH="$$MODEL_HASH" \
@@ -411,12 +468,30 @@ endif
 		TOKEN_ADDRESS="$$TOKEN_ADDRESS" \
 		TASK_ADDRESS="$$TASK_ADDRESS" \
 		S3_COMPAT_ENDPOINT_URL="$$S3_ENDPOINT" \
-		S3_COMPAT_BUCKET='$(S3_COMPAT_BUCKET)' \
-		S3_COMPAT_ACCESS_KEY='$(S3_COMPAT_ACCESS_KEY)' \
-		S3_COMPAT_SECRET_KEY='$(S3_COMPAT_SECRET_KEY)' \
+		S3_COMPAT_BUCKET="$$BUCKET" \
+		S3_COMPAT_ACCESS_KEY="$$ACCESS_KEY" \
+		S3_COMPAT_SECRET_KEY="$$SECRET_KEY" \
 		S3_COMPAT_REGION='$(S3_COMPAT_REGION)' \
 		S3_COMPAT_ADDRESSING_STYLE='$(S3_COMPAT_ADDRESSING_STYLE)' \
-		S3_COMPAT_VERIFY_SSL='$(S3_COMPAT_VERIFY_SSL)'
+		S3_COMPAT_VERIFY_SSL='$(S3_COMPAT_VERIFY_SSL)'; \
+	echo ""; \
+	echo "============================================================"; \
+	echo "[flock-addon] local-chain + S3-compatible deployment complete"; \
+	echo "  TASK_ADDRESS  = $$TASK_ADDRESS"; \
+	echo "  TOKEN_ADDRESS = $$TOKEN_ADDRESS"; \
+	echo "  CHAIN_RPC     = http://$(RPC_HOST):8545"; \
+	echo "  S3_ENDPOINT   = $$S3_ENDPOINT"; \
+	echo "  S3_BUCKET     = $$BUCKET"; \
+	echo "  ACCESS_KEY    = $$ACCESS_KEY"; \
+	echo "  SECRET_KEY    = (hidden — run 'make minio-credentials')"; \
+	echo "  MODEL_KEY     = $$BUCKET/$$MODEL_HASH"; \
+	echo "============================================================"; \
+	echo "Next steps:"; \
+	echo "  1. Enable the addon on each managed cluster:"; \
+	echo "       make enable-addon CLUSTER=<name>"; \
+	echo "  2. Tear everything down when the task is finished:"; \
+	echo "       make undeploy-local-chain FL_ALLIANCE_CLIENT_DIR='$(FL_ALLIANCE_CLIENT_DIR)'"; \
+	echo "============================================================"
 
 # -----------------------------------------------------------------------------
 # Lifecycle helpers
@@ -447,6 +522,113 @@ undeploy: ## Remove the FLock addon Helm release (managed cluster workloads are 
 
 .PHONY: undeploy-all
 undeploy-all: undeploy stop-local-s3-compatible ## Full local cleanup: helm uninstall + stop local MinIO container
+
+# -----------------------------------------------------------------------------
+# Local-chain task helpers
+#
+# `make deploy-local-chain-s3-compatible` materialises three task-scoped
+# pieces of state that the chart's defaults do not encode: the MinIO
+# bucket, the access/secret pair, and the FlockToken/FlockTask addresses.
+# All three live inside the chart's AddOnDeploymentConfig as plain
+# customizedVariable entries because OCM substitutes them into the FL
+# client Pod env on every managed cluster — that's also what guarantees
+# every cluster sees the same values, which is the foundation of
+# multi-client coordination.
+#
+# `minio-credentials` reads them back out via kubectl jsonpath so an
+# operator can drive `mc` from their laptop without re-running the deploy.
+#
+# `undeploy-local-chain` is the reverse of `deploy-local-chain-*`:
+#   1. Read the task's bucket + creds from the live ADC (best effort —
+#      may be empty if the chart was never installed).
+#   2. Drop the bucket via `mc rb --force` so we don't leak per-task data
+#      into /srv/flock-minio when the next task reuses the hub.
+#   3. helm uninstall — OCM addon-manager garbage-collects the per-cluster
+#      ManifestWork and the FL client Deployments cascade away.
+#   4. Stop the MinIO container (idempotent; matches the ephemeral model).
+#   5. Optionally stop the chain when FL_ALLIANCE_CLIENT_DIR is provided —
+#      we call `make chain-stop` defensively (|| true) because the upstream
+#      target name has changed historically and the operator shouldn't have
+#      a half-failed undeploy block them from creating the next task.
+# -----------------------------------------------------------------------------
+
+.PHONY: minio-credentials
+minio-credentials: ## Print the current task's MinIO credentials, bucket, and endpoint URL (read from the live AddOnDeploymentConfig)
+	@set -eu; \
+	if ! $(KUBECTL) -n $(NAMESPACE) get addondeploymentconfig $(RELEASE_NAME)-config >/dev/null 2>&1; then \
+		echo "[flock-addon] ERROR: AddOnDeploymentConfig $(RELEASE_NAME)-config not found in namespace $(NAMESPACE)." >&2; \
+		echo "[flock-addon] Hint: run 'make deploy-local-chain-s3-compatible ...' first." >&2; \
+		exit 1; \
+	fi; \
+	get_var() { \
+		$(KUBECTL) -n $(NAMESPACE) get addondeploymentconfig $(RELEASE_NAME)-config \
+			-o jsonpath="{range .spec.customizedVariables[?(@.name==\"$$1\")]}{.value}{end}"; \
+	}; \
+	BACKEND=$$(get_var STORAGE_BACKEND); \
+	BUCKET=$$(get_var S3_COMPAT_BUCKET); \
+	if [ "$$BACKEND" != "nami" ] || [ -z "$$BUCKET" ]; then \
+		echo "[flock-addon] No active MinIO-backed task found (STORAGE_BACKEND=$$BACKEND, BUCKET=$$BUCKET)."; \
+		echo "[flock-addon] The local-chain MinIO flow is only used by 'make deploy-local-chain-s3-compatible'."; \
+		exit 0; \
+	fi; \
+	ENDPOINT=$$(get_var S3_COMPAT_ENDPOINT_URL); \
+	ACCESS_KEY=$$(get_var S3_COMPAT_ACCESS_KEY); \
+	SECRET_KEY=$$(get_var S3_COMPAT_SECRET_KEY); \
+	echo "ENDPOINT_URL=$$ENDPOINT"; \
+	echo "BUCKET=$$BUCKET"; \
+	echo "ACCESS_KEY=$$ACCESS_KEY"; \
+	echo "SECRET_KEY=$$SECRET_KEY"; \
+	echo ""; \
+	echo "# Explore the bucket from this hub:"; \
+	echo "mc alias set hubminio $$ENDPOINT $$ACCESS_KEY $$SECRET_KEY"; \
+	echo "mc ls hubminio/$$BUCKET/"
+
+.PHONY: undeploy-local-chain
+undeploy-local-chain: ## Tear down a local-chain task: drop bucket + helm uninstall + stop MinIO + optional chain stop (pass FL_ALLIANCE_CLIENT_DIR=...)
+	@set -eu; \
+	if $(KUBECTL) -n $(NAMESPACE) get addondeploymentconfig $(RELEASE_NAME)-config >/dev/null 2>&1; then \
+		get_var() { \
+			$(KUBECTL) -n $(NAMESPACE) get addondeploymentconfig $(RELEASE_NAME)-config \
+				-o jsonpath="{range .spec.customizedVariables[?(@.name==\"$$1\")]}{.value}{end}"; \
+		}; \
+		BACKEND=$$(get_var STORAGE_BACKEND); \
+		BUCKET=$$(get_var S3_COMPAT_BUCKET); \
+		ACCESS_KEY=$$(get_var S3_COMPAT_ACCESS_KEY); \
+		SECRET_KEY=$$(get_var S3_COMPAT_SECRET_KEY); \
+		if [ "$$BACKEND" = "nami" ] && [ -n "$$BUCKET" ] && [ -n "$$ACCESS_KEY" ] && [ -n "$$SECRET_KEY" ]; then \
+			if $(DOCKER) ps --format '{{.Names}}' | grep -qx '$(S3_COMPAT_CONTAINER_NAME)'; then \
+				echo "[flock-addon] removing task bucket: $$BUCKET"; \
+				$(DOCKER) run --rm --network host --entrypoint /bin/sh \
+					-e BUCKET="$$BUCKET" -e ACCESS_KEY="$$ACCESS_KEY" -e SECRET_KEY="$$SECRET_KEY" \
+					'$(MINIO_MC_IMAGE)' -ec '\
+					mc alias set local http://127.0.0.1:$(S3_COMPAT_PORT) "$$ACCESS_KEY" "$$SECRET_KEY" >/dev/null && \
+					mc rb --force --dangerous "local/$$BUCKET" >/dev/null 2>&1' \
+					|| echo "[flock-addon] WARN: bucket cleanup failed (already gone or mc error); continuing"; \
+			else \
+				echo "[flock-addon] MinIO container is not running; skipping bucket cleanup"; \
+			fi; \
+		else \
+			echo "[flock-addon] no MinIO task scope detected in ADC; skipping bucket cleanup"; \
+		fi; \
+	else \
+		echo "[flock-addon] AddOnDeploymentConfig not found; skipping bucket cleanup"; \
+	fi; \
+	echo "[flock-addon] uninstalling Helm release $(RELEASE_NAME)"; \
+	$(HELM) uninstall $(RELEASE_NAME) || true; \
+	$(MAKE) stop-local-s3-compatible; \
+	if [ -n "$(FL_ALLIANCE_CLIENT_DIR)" ]; then \
+		if [ -d "$(FL_ALLIANCE_CLIENT_DIR)" ]; then \
+			echo "[flock-addon] attempting to stop chain via $(FL_ALLIANCE_CLIENT_DIR) (best effort)"; \
+			$(MAKE) -C '$(FL_ALLIANCE_CLIENT_DIR)' chain-stop \
+				$(if $(strip $(CHAIN_DOCKER_COMPOSE)),DOCKER_COMPOSE='$(CHAIN_DOCKER_COMPOSE)') 2>/dev/null \
+				|| echo "[flock-addon] WARN: 'chain-stop' target not available in $(FL_ALLIANCE_CLIENT_DIR); stop the chain manually."; \
+		else \
+			echo "[flock-addon] WARN: FL_ALLIANCE_CLIENT_DIR=$(FL_ALLIANCE_CLIENT_DIR) does not exist; skipping chain stop."; \
+		fi; \
+	else \
+		echo "[flock-addon] FL_ALLIANCE_CLIENT_DIR not set; leaving the chain running. Pass it to also stop the chain."; \
+	fi; \
+	echo "[flock-addon] local-chain teardown complete"
 
 # -----------------------------------------------------------------------------
 # enable-addon

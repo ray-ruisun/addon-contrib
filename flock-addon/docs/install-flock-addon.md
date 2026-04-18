@@ -311,9 +311,13 @@ make undeploy
 # `deploy-local-chain-s3-compatible`, stop it with one of:
 make stop-local-s3-compatible   # removes only the MinIO container
 make undeploy-all               # helm uninstall + stop-local-s3-compatible
+
+# Recommended for the local-chain flow: this drops the per-task bucket,
+# uninstalls the Helm release, stops MinIO, and optionally stops the chain.
+make undeploy-local-chain FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client
 ```
 
-The local MinIO data directory (`S3_COMPAT_DATA_DIR`, default `/srv/flock-minio/data`) is intentionally left in place so you can reuse uploaded artifacts across re-deploys. Delete it manually when you are done.
+The local MinIO data directory (`S3_COMPAT_DATA_DIR`, default `/srv/flock-minio/data`) is intentionally left in place so you can reuse uploaded artifacts across re-deploys. Per-task buckets inside it are dropped by `make undeploy-local-chain`; delete the host directory manually if you also want to free the disk.
 
 ## Next Steps
 

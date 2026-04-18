@@ -165,6 +165,28 @@ Important:
 - the hub auto-pushes `S3_COMPAT_ENDPOINT_URL`, `S3_COMPAT_BUCKET`, `S3_COMPAT_ACCESS_KEY`, `S3_COMPAT_SECRET_KEY`, `S3_COMPAT_REGION`, `S3_COMPAT_ADDRESSING_STYLE`, and `S3_COMPAT_VERIFY_SSL`
 - nodes only need their own local secrets such as `PRIVATE_KEY` and `HF_TOKEN`
 
+### Ephemeral, task-scoped local storage
+
+Each `make deploy-local-chain-s3-compatible` invocation provisions a brand-new task. To keep operators safe and tasks isolated, the hub generates the following per task and propagates them through the AddOnDeploymentConfig so every managed cluster receives the *same* values:
+
+- a fresh access/secret pair (16/24-byte hex from `openssl rand`) — overrides the legacy `minioadmin` defaults
+- a task-scoped bucket name `flock-task-<sha256[:12]>` derived from `MODEL_ARCHIVE`
+
+Multi-client coordination is preserved exactly: every FL client Pod still resolves the same `S3_COMPAT_BUCKET`, `S3_COMPAT_ACCESS_KEY`, and `S3_COMPAT_SECRET_KEY` because OCM substitutes those customizedVariables identically on every cluster. The only difference is that the value being substituted is now task-unique instead of a well-known constant.
+
+If you need to pin known values (e.g. for repeatable CI smoke tests), pass them on the make command line and the hub will skip the random generation:
+
+```bash
+# [Hub] (optional; defaults are auto-generated)
+make deploy-local-chain-s3-compatible \
+  ... \
+  MINIO_ACCESS_KEY=ci-access \
+  MINIO_SECRET_KEY=ci-secret \
+  MINIO_BUCKET=flock-ci
+```
+
+Hub reboots while a local-chain task is running mean the chain process and MinIO container are both lost; re-create the task from scratch with `make deploy-local-chain-s3-compatible`.
+
 Managed cluster node `.env`:
 
 ```dotenv
@@ -206,7 +228,7 @@ Important:
 - this mode also waits for the local MinIO upload and the one-shot `deployer` step before Helm deploy starts
 - if you interrupt this step early, `data/contracts.json` may be missing or incomplete, and the addon will not get valid `TOKEN_ADDRESS` or `TASK_ADDRESS`
 
-Optional manual local S3-compatible service on the hub:
+Optional manual local S3-compatible service on the hub (only useful for ad-hoc `mc cp` debugging — `make deploy-local-chain-s3-compatible` already starts and configures MinIO with task-scoped credentials):
 
 ```bash
 # [Hub]
@@ -219,6 +241,14 @@ docker run -d \
   -e MINIO_ROOT_PASSWORD=minioadmin \
   -v /srv/minio/data:/data \
   quay.io/minio/minio server /data --console-address ":9001"
+```
+
+To recover the credentials and bucket name of the currently deployed task:
+
+```bash
+# [Hub]
+make minio-credentials
+# Prints ENDPOINT_URL=, BUCKET=, ACCESS_KEY=, SECRET_KEY= and an `mc alias set` snippet.
 ```
 
 Check:
@@ -286,4 +316,11 @@ make undeploy
 # Remove the Helm release AND stop the local MinIO container started by
 # deploy-local-chain-s3-compatible (the data directory is left on disk):
 make undeploy-all
+
+# Tear down a complete local-chain task: drop the per-task MinIO bucket,
+# uninstall the Helm release, stop the MinIO container, and (when
+# FL_ALLIANCE_CLIENT_DIR is provided) attempt to stop the local chain.
+# Use this between successive `deploy-local-chain-*` invocations so you
+# never leave stale per-task buckets on disk.
+make undeploy-local-chain FL_ALLIANCE_CLIENT_DIR=/path/to/FL-Alliance-Client
 ```
