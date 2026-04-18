@@ -396,9 +396,15 @@ endif
 	echo "  MODEL_HASH    = $(MODEL_HASH)"; \
 	echo "============================================================"; \
 	echo "Next steps:"; \
-	echo "  1. Enable the addon on each managed cluster:"; \
+	echo "  - Already-enabled clusters pick up the new task/chain config"; \
+	echo "    automatically (OCM addon-manager reconciles the new"; \
+	echo "    AddOnDeploymentConfig into each cluster's ManifestWork)."; \
+	echo "    Verify with:"; \
+	echo "       kubectl -n <cluster> get manifestwork addon-flock-addon-deploy-0"; \
+	echo "       kubectl --context=<managed> -n flock-system get pod -l app.kubernetes.io/name=flock-addon"; \
+	echo "  - For clusters NOT YET enabled, opt them in once:"; \
 	echo "       make enable-addon CLUSTER=<name>"; \
-	echo "  2. Tear everything down when the task is finished:"; \
+	echo "  - Tear everything down when the task is finished:"; \
 	echo "       make undeploy-local-chain FL_ALLIANCE_CLIENT_DIR='$(FL_ALLIANCE_CLIENT_DIR)'"; \
 	echo "============================================================"
 
@@ -500,9 +506,17 @@ endif
 	echo "  MODEL_KEY     = $$BUCKET/$$MODEL_HASH"; \
 	echo "============================================================"; \
 	echo "Next steps:"; \
-	echo "  1. Enable the addon on each managed cluster:"; \
+	echo "  - Already-enabled clusters pick up the new task, chain, bucket,"; \
+	echo "    and credentials automatically (OCM addon-manager reconciles"; \
+	echo "    the new AddOnDeploymentConfig into each cluster's"; \
+	echo "    ManifestWork). Verify with:"; \
+	echo "       kubectl -n <cluster> get manifestwork addon-flock-addon-deploy-0"; \
+	echo "       kubectl --context=<managed> -n flock-system get pod -l app.kubernetes.io/name=flock-addon"; \
+	echo "  - For clusters NOT YET enabled, opt them in once:"; \
 	echo "       make enable-addon CLUSTER=<name>"; \
-	echo "  2. Tear everything down when the task is finished:"; \
+	echo "  - Recover the MinIO credentials at any time:"; \
+	echo "       make minio-credentials"; \
+	echo "  - Tear everything down when the task is finished:"; \
 	echo "       make undeploy-local-chain FL_ALLIANCE_CLIENT_DIR='$(FL_ALLIANCE_CLIENT_DIR)'"; \
 	echo "============================================================"
 

@@ -137,17 +137,30 @@ Should see:
 - `TASK_ADDRESS` matches the hub-generated value
 - the deployed task was created from the `MODEL_HASH` you passed to `make chain`
 
-After the hub-side deploy finishes, re-enable the addon on each target managed cluster so it reconciles onto the new config:
+After the hub-side deploy finishes:
 
-```bash
-# [Hub]
-make disable-addon CLUSTER=<cluster-a>
-make enable-addon CLUSTER=<cluster-a>
-make disable-addon CLUSTER=<cluster-b>
-make enable-addon CLUSTER=<cluster-b>
-make disable-addon CLUSTER=<cluster-c>
-make enable-addon CLUSTER=<cluster-c>
-```
+- Clusters that are **already enabled** pick up the new `BLOCKCHAIN_RPC`, `TASK_ADDRESS`, and `TOKEN_ADDRESS` automatically. The OCM addon-manager detects the bumped `AddOnDeploymentConfig.metadata.generation`, re-renders the per-cluster `ManifestWork`, and the FL client Pod rolls with the new env. No operator action is required; verify with:
+
+  ```bash
+  # [Hub]
+  kubectl -n <cluster> get managedclusteraddon flock-addon -o yaml | grep -A2 lastObservedGeneration
+  kubectl --context=<managed> -n flock-system get pod -l app.kubernetes.io/name=flock-addon
+  ```
+
+- Clusters that have **never been enabled** still need a one-time opt-in:
+
+  ```bash
+  # [Hub]
+  make enable-addon CLUSTER=<cluster-a>
+  ```
+
+- Force an immediate Pod restart only if you suspect reconcile is stuck or you are switching CPU↔GPU templates (see [Troubleshooting](troubleshooting.md)):
+
+  ```bash
+  # [Hub] — equivalent to deleting + recreating the ManagedClusterAddOn
+  make disable-addon CLUSTER=<cluster-a>
+  make enable-addon CLUSTER=<cluster-a>
+  ```
 
 ## Local Chain + Local S3-Compatible Storage Mode
 
@@ -284,15 +297,12 @@ Should see:
 - `S3_COMPAT_ENDPOINT_URL` points to `http://<hub-ip>:9000`
 - client logs include `Using direct S3-compatible storage backend`
 
-After the hub-side deploy finishes, re-enable the addon on each target managed cluster:
+After the hub-side deploy finishes, the same rule as the previous mode applies — already-enabled clusters reconcile onto the new bucket, credentials, RPC, and task addresses without operator action; new clusters need a one-time `make enable-addon CLUSTER=<name>`. Use `make disable-addon` + `make enable-addon` only to force an immediate Pod restart or to switch CPU↔GPU templates:
 
 ```bash
 # [Hub]
-make disable-addon CLUSTER=<cluster-a>
-make enable-addon CLUSTER=<cluster-a>
-make disable-addon CLUSTER=<cluster-b>
+make enable-addon CLUSTER=<cluster-a>   # one-time, only if never enabled
 make enable-addon CLUSTER=<cluster-b>
-make disable-addon CLUSTER=<cluster-c>
 make enable-addon CLUSTER=<cluster-c>
 ```
 
