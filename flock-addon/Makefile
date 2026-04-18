@@ -17,6 +17,19 @@
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
+# Recipe shell
+#
+# GNU make's default `/bin/sh` is dash on Debian/Ubuntu, which rejects
+# `set -o pipefail` and a few other niceties this Makefile (and the
+# embedded entrypoint script under templates/addon-template.yaml) relies
+# on. Pinning bash with the strict flags is the canonical fix and matches
+# what every recipe is already written against. `.SHELLFLAGS` is GNU
+# make >= 3.82, available on every distro the addon targets.
+# -----------------------------------------------------------------------------
+SHELL := /bin/bash
+.SHELLFLAGS := -eu -o pipefail -c
+
+# -----------------------------------------------------------------------------
 # Tool binaries
 #
 # Kept overrideable so the same recipes work on hosts that need `sudo docker`
