@@ -28,11 +28,12 @@ Integrate [FLock FL Alliance](https://github.com/FLock-io/FL-Alliance-Client) (`
 
 | Mode                              | Command | Best for |
 |-----------------------------------| --- | --- |
-| Local chain + local S3-compatible | `make deploy-local-chain-s3-compatible` | Recommended default path: fully self-contained deployment with hub-managed local chain and object storage |
-| Local chain + original S3         | `make deploy-local-chain-s3` | Use when you want a hub-hosted local chain but still depend on an existing external S3 model artifact |
-| Testnet                           | `make deploy-testnet` | Use when you already have an on-chain task and shared external S3 workflow ready on testnet |
+| Bare install (node-managed)       | `make deploy` | Canonical OCM flow: install the chart with default values and let each managed cluster supply `TASK_ADDRESS` / `TOKEN_ADDRESS` / `BLOCKCHAIN_RPC` / `PRIVATE_KEY` from its own `.env`. Follow with `make enable-addon CLUSTER=<name>` per cluster. |
+| Testnet (hub-pinned task)         | `make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...]` | Public testnet when the hub should centrally pin the task (and optionally token) contract addresses so `make update-task` can rotate them without touching every node's `.env`. |
+| Local chain + original S3         | `make deploy-local-chain-s3` | Hub bootstraps its own local RPC + FlockToken/FlockTask, then deploys the addon. External S3 still backs model artefacts. |
+| Local chain + local S3-compatible | `make deploy-local-chain-s3-compatible` | Fully self-contained: hub bootstraps local RPC, FlockToken/FlockTask, and a local MinIO. Recommended for offline demos and unfunded smoke tests. |
 
-Recommended default: start with `Local chain + local S3-compatible`. It keeps the blockchain and storage dependencies inside the managed environment, while the other two modes depend on an existing on-chain task and/or external S3 storage.
+Pick `make deploy` when individual nodes already own their task address and keys; pick one of the hub-managed variants when the hub should be the single source of truth for fleet-wide configuration. The entrypoint script's hub-vs-`.env` precedence rule guarantees that switching between the two styles never requires re-enabling the addon per cluster.
 
 Full mode details are in [Deployment Modes](docs/deployment-modes.md).
 

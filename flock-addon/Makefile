@@ -132,12 +132,55 @@ all: help
 # -----------------------------------------------------------------------------
 # Public deploy targets
 #
-# Thin wrappers over `helm upgrade --install`. The `_deploy-*` siblings
-# below are intentionally underscored: they assume their inputs are already
-# validated and are reused by the deploy-local-chain-* targets after those
-# have done the chain bootstrap. End users should never call the
-# underscored variants directly.
+# Three public entrypoints with intentionally different authority models:
+#
+#   make deploy
+#       Install the chart on the hub with default values.yaml settings
+#       (Manual install strategy, storage.backend=s3, empty chain
+#       addresses). Nodes supply TASK_ADDRESS / TOKEN_ADDRESS /
+#       BLOCKCHAIN_RPC / PRIVATE_KEY via their per-node `.env`. This is
+#       the canonical OCM flow most operators expect:
+#           make deploy
+#           make enable-addon CLUSTER=m1
+#           make enable-addon CLUSTER=m2
+#           ...
+#
+#   make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...]
+#       Same layout but the hub centrally pins task (and optionally
+#       token) contract addresses so `make update-task` can rotate them
+#       without touching every node's `.env`. Use on FLock's public
+#       testnet when operators want fleet-wide control of the task.
+#
+#   make deploy-local-chain-s3 / deploy-local-chain-s3-compatible
+#       Hub bootstraps its own FlockToken/FlockTask on a local RPC (and,
+#       in the -compatible variant, a local MinIO), then calls the
+#       internal `_deploy-local-chain-*` recipes to install the chart
+#       with every hub-side address already filled in. For unfunded
+#       local-chain smoke tests and fully offline demos.
+#
+# `_deploy-*` targets are underscored because they assume their inputs
+# are already validated by the outer deploy-local-chain-* flows; end
+# users should never call the underscored variants directly.
 # -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# deploy
+#
+# The bare minimum: install the chart with defaults. Chain addresses and
+# PRIVATE_KEY come from each managed cluster's `.env`; the entrypoint
+# script's hub-vs-.env precedence rule means operators can later run any
+# `deploy-testnet` or `update-task` variant to take hub-side control
+# without re-enabling the addon per cluster. Storage backend stays on the
+# values.yaml default (`s3`) so FLock's testnet signer-authenticated
+# uploads work out of the box.
+# -----------------------------------------------------------------------------
+.PHONY: deploy
+deploy: ## Install the addon control plane on the hub with default values (enable per cluster with `make enable-addon`)
+	$(HELM) upgrade --install $(RELEASE_NAME) $(CHART_PATH) \
+		--set image.repository=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f2- | rev) \
+		--set image.tag=$$(echo $(FLOCK_ALLIANCE_IMAGE) | rev | cut -d: -f1 | rev) \
+		--set image.pullPolicy='$(IMAGE_PULL_POLICY)' \
+		$(IMAGE_PULL_SECRET_ARG)
 
 .PHONY: deploy-testnet
 deploy-testnet: ## Deploy addon for testnet mode (usage: make deploy-testnet TASK_ADDRESS=0x... [TOKEN_ADDRESS=0x...])
