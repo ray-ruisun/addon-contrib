@@ -4,9 +4,11 @@ Use this guide to choose the runtime image for `flock-addon`, publish a custom b
 
 ## Default Image Resolution
 
-Chart fallback image:
+Chart fallback image (from `values.yaml`):
 
-- `ghcr.io/flock-io/fl-alliance-client:<release-tag>`
+- `ghcr.io/flock-io/fl-alliance-client:latest`
+
+> The `latest` tag is convenient for `kind`/`k3d` smoke tests but defeats Kubernetes' ability to detect that the image actually changed across rollouts. For anything beyond local development, override `IMAGE_TAG` (or `FLOCK_ALLIANCE_IMAGE`) with an immutable reference such as a release tag or short git SHA, and consider switching `IMAGE_PULL_POLICY=IfNotPresent` to skip the registry round-trip on every Pod restart.
 
 Environment-variable based overrides supported by the `Makefile`:
 

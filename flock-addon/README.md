@@ -26,7 +26,7 @@ Integrate [FLock FL Alliance](https://github.com/FLock-io/FL-Alliance-Client) (`
 | Placement | Automatically selects a CPU or GPU addon template from the managed cluster label `gpu=true` |
 | Data Locality | Reads `.env`, datasets, and model inputs from node-mounted storage so each cluster trains on its own local resources |
 | Configuration Authority | Hub-pushed values (task address, storage backend, hub-managed RPC/S3) always win over stale values in node `.env`, regardless of storage backend |
-| Modes | Supports testnet, local chain + original S3, and local chain + local S3-compatible storage workflows |
+| Modes | Supports four deployment flows: bare install (node-managed `.env`), testnet (hub-pinned task), local chain + original S3, and local chain + local S3-compatible storage |
 
 ## Supported Deployment Modes
 
@@ -73,7 +73,7 @@ Full mode details are in [Deployment Modes](docs/deployment-modes.md).
 
 - [Prepare Multi-Cluster Environment](docs/prepare-multicluster-environment.md) - build Kubernetes clusters, install OCM, register managed clusters, and verify ManifestWork distribution
 - [Install FLock Addon](docs/install-flock-addon.md) - first deployment path for the recommended default workflow
-- [Deployment Modes](docs/deployment-modes.md) - compare and run the three supported deployment modes
+- [Deployment Modes](docs/deployment-modes.md) - compare and run the four supported deployment modes
 - [Image Management](docs/image-management.md) - choose public/private images and publish custom builds
 - [Configuration and Overrides](docs/configuration-and-overrides.md) - runtime model, path rules, task updates, and per-cluster overrides
 - [Troubleshooting](docs/troubleshooting.md) - image pull, OCM distribution, GPU mapping, and log collection

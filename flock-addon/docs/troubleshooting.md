@@ -185,12 +185,12 @@ POD=$(kubectl -n flock-system get pod -l app.kubernetes.io/component=agent -o js
 kubectl -n flock-system logs "$POD" -c flock-alliance-client --tail=200 | rg -n "^\[flock-addon\]"
 ```
 
-Should see three kinds of lines:
+Should see the following lines, in order:
 
 - `startup: image entrypoint beginning`
 - `vars: USE_GPU=... STORAGE_BACKEND=... TASK_ADDRESS=...` (raw hub-pushed values)
 - `loading env file: /data/.env` (or a warning if it is missing)
-- `effective: STORAGE_BACKEND=... TASK_ADDRESS=...` (final values after OCM-wins reassertion)
+- `effective: STORAGE_BACKEND=... TASK_ADDRESS=...` (final values after OCM-wins reassertion; sensitive fields are rendered as `<set>` or `<empty>` so secrets never reach the log)
 - `exec: python -u main.py ...`
 
 If `effective: TASK_ADDRESS=<empty>`, either the hub is not pushing the value or a stale `.env` is setting it to an empty string. Check the hub-side `AddOnDeploymentConfig`:

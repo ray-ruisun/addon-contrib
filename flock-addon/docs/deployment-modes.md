@@ -1,11 +1,12 @@
 # Deployment Modes
 
-`flock-addon` supports three deployment modes. The recommended default is `deploy-local-chain-s3-compatible`, because it keeps both blockchain and storage under hub-managed control and avoids depending on an existing on-chain task or external S3 bucket.
+`flock-addon` supports four deployment modes. The recommended default for self-contained dev is `deploy-local-chain-s3-compatible`, because it keeps both blockchain and storage under hub-managed control and avoids depending on an existing on-chain task or external S3 bucket. For canonical OCM rollouts where each managed cluster already owns its task / chain configuration in `.env`, use the bare `make deploy`.
 
 ## Mode Summary
 
 | Mode | Command | Blockchain source | Storage backend | Model input |
 | --- | --- | --- | --- | --- |
+| Bare install (node-managed) | `make deploy` | From each node's `.env` (`BLOCKCHAIN_RPC`) | `s3` (chart default) | From each node's `.env` (`TASK_ADDRESS`) |
 | Local chain + local S3-compatible | `make deploy-local-chain-s3-compatible` | Hub starts local chain | `nami` | Local `MODEL_ARCHIVE` uploaded by the hub |
 | Local chain + original S3 | `make deploy-local-chain-s3` | Hub starts local chain | `s3` | Existing uploaded `MODEL_HASH` |
 | Testnet | `make deploy-testnet` | Existing external RPC from node `.env` | `s3` | Existing onchain task |
@@ -28,19 +29,50 @@ Choose the other modes only when their external dependencies are already part of
 
 ## Environment Requirements by Mode
 
-| Variable | `deploy-testnet` | `deploy-local-chain-s3` | `deploy-local-chain-s3-compatible` |
-| --- | --- | --- | --- |
-| `PRIVATE_KEY` | required | required | required |
-| `HF_TOKEN` | required | required | required |
-| `BLOCKCHAIN_RPC` | required from node `.env` | pushed from the hub | pushed from the hub |
-| `TOKEN_ADDRESS` | optional from node `.env` when the hub leaves it empty | pushed from the hub | pushed from the hub |
-| `S3_COMPAT_ENDPOINT_URL` | not used | not used | pushed from the hub |
-| `S3_COMPAT_BUCKET` | not used | not used | pushed from the hub |
-| `S3_COMPAT_ACCESS_KEY` | not used | not used | pushed from the hub |
-| `S3_COMPAT_SECRET_KEY` | not used | not used | pushed from the hub |
-| `S3_COMPAT_REGION` | not used | not used | pushed from the hub |
-| `S3_COMPAT_ADDRESSING_STYLE` | not used | not used | pushed from the hub |
-| `S3_COMPAT_VERIFY_SSL` | not used | not used | pushed from the hub |
+| Variable | `deploy` | `deploy-testnet` | `deploy-local-chain-s3` | `deploy-local-chain-s3-compatible` |
+| --- | --- | --- | --- | --- |
+| `PRIVATE_KEY` | required | required | required | required |
+| `HF_TOKEN` | required | required | required | required |
+| `BLOCKCHAIN_RPC` | required from node `.env` | required from node `.env` | pushed from the hub | pushed from the hub |
+| `TASK_ADDRESS` | required from node `.env` | pushed from the hub | pushed from the hub | pushed from the hub |
+| `TOKEN_ADDRESS` | required from node `.env` | optional from node `.env` when the hub leaves it empty | pushed from the hub | pushed from the hub |
+| `S3_COMPAT_ENDPOINT_URL` | not used | not used | not used | pushed from the hub |
+| `S3_COMPAT_BUCKET` | not used | not used | not used | pushed from the hub |
+| `S3_COMPAT_ACCESS_KEY` | not used | not used | not used | pushed from the hub |
+| `S3_COMPAT_SECRET_KEY` | not used | not used | not used | pushed from the hub |
+| `S3_COMPAT_REGION` | not used | not used | not used | pushed from the hub |
+| `S3_COMPAT_ADDRESSING_STYLE` | not used | not used | not used | pushed from the hub |
+| `S3_COMPAT_VERIFY_SSL` | not used | not used | not used | pushed from the hub |
+
+## Bare Install Mode
+
+The canonical OCM flow: install the chart on the hub with default values and let each managed cluster supply chain coordinates from its own `.env`. Use this when individual nodes already own their `TASK_ADDRESS`, `TOKEN_ADDRESS`, `BLOCKCHAIN_RPC`, and `PRIVATE_KEY`, and you do not want the hub to be the source of truth.
+
+```bash
+# [Hub]
+make deploy
+```
+
+Node `.env` example:
+
+```dotenv
+PRIVATE_KEY=<private-key>
+HF_TOKEN=<hf-token>
+BLOCKCHAIN_RPC=<rpc-url>
+TOKEN_ADDRESS=0x<token-address>
+TASK_ADDRESS=0x<task-address>
+```
+
+Common rollout pattern after the hub-side deploy:
+
+```bash
+# [Hub]
+make enable-addon CLUSTER=<cluster-a>
+make enable-addon CLUSTER=<cluster-b>
+make enable-addon CLUSTER=<cluster-c>
+```
+
+Because the entrypoint's hub-vs-`.env` precedence rule treats empty hub values as "fall through to `.env`", you can later run `make deploy-testnet` (or any hub-managed variant) to take centralised control of the task address without re-enabling the addon per cluster.
 
 ## Testnet Mode
 

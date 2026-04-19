@@ -42,7 +42,7 @@ For the recommended default path, also prepare:
 
 If you need a different deployment path, use [Deployment Modes](deployment-modes.md). If you need a custom or private image, use [Image Management](image-management.md) before enabling the addon.
 
-If you are following older testing notes or screenshots, the old `make deploy` flow maps conceptually to the hub-side addon deploy step, but the current `Makefile` uses explicit mode-specific commands such as `make deploy-local-chain-s3-compatible`.
+If you only want the canonical OCM flow (chart on the hub with defaults, each managed cluster supplies its own `.env`), use `make deploy` instead — see [Deployment Modes → Bare Install Mode](deployment-modes.md#bare-install-mode).
 
 ## Step 1: Prepare the Node Path
 
@@ -170,17 +170,16 @@ Check:
 ```bash
 # [Hub]
 kubectl get clustermanagementaddon flock-addon
-kubectl -n open-cluster-management get addontemplate flock-addon
-kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config -o yaml | rg -n "TASK_ADDRESS|BLOCKCHAIN_RPC|S3_COMPAT_ENDPOINT_URL|FLOCK_ALLIANCE_IMAGE|value"
+kubectl get addontemplate flock-addon flock-addon-gpu
+kubectl -n open-cluster-management get addondeploymentconfig flock-addon-config flock-addon-gpu-config -o yaml | rg -n "TASK_ADDRESS|BLOCKCHAIN_RPC|S3_COMPAT_ENDPOINT_URL|FLOCK_ALLIANCE_IMAGE|value"
 ```
 
 Should see:
 
-- `clustermanagementaddon/flock-addon` exists
-- `addontemplate/flock-addon` exists
-- `addontemplate/flock-addon-gpu` exists
-- `addondeploymentconfig/flock-addon-config` exists
-- `addondeploymentconfig/flock-addon-gpu-config` exists
+- `clustermanagementaddon/flock-addon` exists (cluster-scoped)
+- `addontemplate/flock-addon` and `addontemplate/flock-addon-gpu` exist (cluster-scoped)
+- `addondeploymentconfig/flock-addon-config` exists in `open-cluster-management`
+- `addondeploymentconfig/flock-addon-gpu-config` exists in `open-cluster-management`
 - `TASK_ADDRESS` matches the hub-generated value
 - `BLOCKCHAIN_RPC` points to the hub-hosted local chain
 - `S3_COMPAT_ENDPOINT_URL` points to the hub-hosted local S3-compatible service
