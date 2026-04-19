@@ -28,6 +28,7 @@ Before using this guide, complete [Prepare Multi-Cluster Environment](prepare-mu
 - OCM hub and managed clusters are already available and healthy
 - `kubectl`, `helm`, and `make` are installed on the hub
 - Every node that may run the addon Pod has a shared host path, usually `/data/flock-client`
+- (Optional) `ripgrep` is installed on the hub for the verification commands shown below; substitute `grep` if you prefer. On Ubuntu/Debian: `sudo apt install -y ripgrep`
 - This repository is checked out on the hub machine:
 
 ```bash
@@ -69,7 +70,19 @@ Should see:
 - `/data/flock-client` exists
 - your login user can read and write `/data/flock-client`
 
-If your workflow depends on node-local input files, copy them into `/data/flock-client` now. This directory is mounted into the container at `/data`.
+If your workflow depends on node-local input files (per-client dataset shards, demo fixtures, model inputs), copy them into `/data/flock-client` now. This directory is mounted into the container at `/data`.
+
+Concrete example for a sharded federated dataset where each managed cluster gets a different client slice:
+
+```bash
+# [Each Managed Cluster Node]
+# Replace <path-to-client-shard> with the absolute path on this node that
+# holds the FL client slice you want this cluster to train on
+# (e.g. a per-client folder unpacked from a demo dataset archive).
+cp <path-to-client-shard>/* /data/flock-client/
+ls -la /data/flock-client/
+```
+
 
 ## Step 2: Create the Node `.env`
 

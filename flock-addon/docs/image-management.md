@@ -20,7 +20,7 @@ Environment-variable based overrides supported by the `Makefile`:
 - `IMAGE_PULL_SECRET`, optional managed-cluster image pull secret name
 - `FLOCK_ALLIANCE_IMAGE`, overrides all of the above
 
-Example:
+Example using exported environment variables (useful when the same overrides apply to several `make` invocations in the same shell session):
 
 ```bash
 # [Hub]
@@ -38,6 +38,19 @@ Use it for deployment. Replace the deploy command with the mode you are actually
 # [Hub]
 make <deploy-command> <mode-specific-args>
 ```
+
+Equivalent inline shorthand (useful for one-shot deploys, e.g. pinning a specific git SHA tag or attaching a pull secret for a single rollout, without polluting the shell environment):
+
+```bash
+# [Hub]
+make deploy \
+  IMAGE_OWNER=<image-owner> \
+  IMAGE_TAG=<git-sha-or-release-tag> \
+  IMAGE_PULL_SECRET=ghcr-pull \
+  IMAGE_PULL_POLICY=Always
+```
+
+Both forms set the same Make variables; pick whichever matches your workflow.
 
 Check:
 
