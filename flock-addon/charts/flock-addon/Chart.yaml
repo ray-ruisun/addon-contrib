@@ -14,10 +14,9 @@ keywords:
   - open-cluster-management
   - machine-learning
 home: https://github.com/FLock-io
-icon: https://open-cluster-management.io/images/ocm-logo.svg
 sources:
   - https://github.com/FLock-io/FL-Alliance-Client
   - https://github.com/open-cluster-management-io/addon-contrib/tree/main/flock-addon
 maintainers:
-  - name: open-cluster-management-io
-    url: https://open-cluster-management.io
+  - name: flock-io
+    url: https://github.com/FLock-io

@@ -8,6 +8,9 @@
   "flower-addon": {
     "e2e-artifacts": ["flower-addon.tar.gz"]
   },
+  "flock-addon": {
+    "e2e-artifacts": ["flock-addon.tar.gz"]
+  },
   "kueue-addon": {
     "e2e-artifacts": ["kueue-addon.tar.gz"]
   },
